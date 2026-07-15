@@ -88,7 +88,11 @@ class SettingsActionLayoutTests(unittest.TestCase):
     def test_v2_editor_groups_boundaries_and_interval_columns_compactly(self):
         self.app._open_v2_settings()
         self.root.update_idletasks()
-        window = self.app.v2_window
+        window = next(
+            child
+            for child in self.root.winfo_children()
+            if isinstance(child, tk.Toplevel)
+        )
         descendants = tuple(self._descendants(window))
 
         sections = {

@@ -36,7 +36,6 @@ from .presentation import (
     responsive_window_layout,
     runtime_window_layout,
     scroll_fraction_to_reveal,
-    v2_window_layout,
 )
 from .resources import install_dir, resource_path
 from .reminder_view import (
@@ -56,6 +55,7 @@ from .settings_form import (
 from .single_instance import SingleInstanceGuard, show_native_message
 from .startup import StartupManager, StartupMode, should_start_hidden
 from .tray import TrayService
+from .v2_settings_dialog import V2SettingsDialog
 
 
 PHASE_NAMES = {
@@ -327,6 +327,12 @@ class CountdownApp:
         self.pause_hotkey_var = self.settings_form.pause_hotkey
         self.window_hotkey_var = self.settings_form.window_hotkey
         self.startup_var = tk.StringVar()
+        self.v2_dialog = V2SettingsDialog(
+            self.root,
+            self.settings_form,
+            on_reset=self._reset_v2_defaults,
+            on_closed=self._refresh_algorithm_controls,
+        )
 
         self.basic_canvas = tk.Canvas(
             self.settings_frame,
@@ -915,108 +921,7 @@ class CountdownApp:
         self.startup_mode = requested
 
     def _open_v2_settings(self) -> None:
-        if getattr(self, "v2_window", None) is not None:
-            try:
-                if self.v2_window.winfo_exists():
-                    self.v2_window.deiconify()
-                    self.v2_window.lift()
-                    return
-            except tk.TclError:
-                pass
-
-        window = tk.Toplevel(self.root)
-        self.v2_window = window
-        window.title("V2 节律设置")
-        layout = v2_window_layout(window.winfo_screenwidth(), window.winfo_screenheight())
-        window.geometry(layout.geometry)
-        window.minsize(layout.min_width, layout.min_height)
-        window.transient(self.root)
-        body = ttk.Frame(window, padding=(16, 12), style="App.TFrame")
-        body.pack(fill="both", expand=True)
-        body.columnconfigure(0, weight=1)
-
-        ttk.Label(body, text="V2 节律设置", style="Section.TLabel").grid(
-            row=0, column=0, sticky="w", pady=(0, 2)
-        )
-        ttk.Label(
-            body,
-            text="主页面的最小/最大间隔对应注意力锚定期。这里可以调整全部阶段。",
-            style="Subtitle.TLabel",
-            wraplength=510,
-        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
-
-        boundaries = ttk.LabelFrame(
-            body, text="阶段边界", padding=(10, 4), style="Settings.TLabelframe"
-        )
-        boundaries.grid(row=2, column=0, sticky="ew", pady=(0, 6))
-        boundaries.columnconfigure(1, weight=1)
-        for row, (label, variable) in enumerate(
-            (
-                ("锚定期结束", self.anchor_end_var),
-                ("疲劳期开始", self.fatigue_start_var),
-            )
-        ):
-            ttk.Label(boundaries, text=label).grid(
-                row=row, column=0, sticky="w", padx=(0, 12), pady=1
-            )
-            ttk.Entry(boundaries, textvariable=variable, width=12).grid(
-                row=row, column=1, sticky="ew", pady=1
-            )
-            ttk.Label(boundaries, text="分钟").grid(
-                row=row, column=2, sticky="w", padx=(8, 0), pady=1
-            )
-
-        intervals = ttk.LabelFrame(
-            body,
-            text="阶段随机间隔（分钟）",
-            padding=(10, 4),
-            style="Settings.TLabelframe",
-        )
-        intervals.grid(row=3, column=0, sticky="ew")
-        intervals.columnconfigure((1, 2), weight=1)
-        ttk.Label(intervals, text="阶段", style="Section.TLabel").grid(
-            row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 1)
-        )
-        ttk.Label(intervals, text="最小", style="Section.TLabel").grid(
-            row=0, column=1, sticky="w", pady=(0, 1)
-        )
-        ttk.Label(intervals, text="最大", style="Section.TLabel").grid(
-            row=0, column=2, sticky="w", padx=(8, 0), pady=(0, 1)
-        )
-        interval_rows = (
-            ("锚定期", self.anchor_min_var, self.anchor_max_var),
-            ("深度期", self.deep_min_var, self.deep_max_var),
-            ("疲劳期", self.fatigue_min_var, self.fatigue_max_var),
-        )
-        for row, (label, minimum, maximum) in enumerate(interval_rows, start=1):
-            ttk.Label(intervals, text=label).grid(
-                row=row, column=0, sticky="w", padx=(0, 12), pady=1
-            )
-            ttk.Entry(intervals, textvariable=minimum, width=10).grid(
-                row=row, column=1, sticky="ew", pady=1
-            )
-            ttk.Entry(intervals, textvariable=maximum, width=10).grid(
-                row=row, column=2, sticky="ew", padx=(8, 0), pady=1
-            )
-
-        actions = ttk.Frame(body, style="App.TFrame")
-        actions.grid(row=4, column=0, sticky="e", pady=(8, 0))
-        ttk.Button(
-            actions, text="恢复默认节律", command=self._reset_v2_defaults
-        ).pack(side="left", padx=(0, 8))
-        ttk.Button(
-            actions, text="完成", style="Primary.TButton", command=self._close_v2_settings
-        ).pack(side="left")
-        window.protocol("WM_DELETE_WINDOW", self._close_v2_settings)
-
-    def _close_v2_settings(self) -> None:
-        window, self.v2_window = getattr(self, "v2_window", None), None
-        if window is not None:
-            try:
-                window.destroy()
-            except tk.TclError:
-                pass
-        self._refresh_algorithm_controls()
+        self.v2_dialog.show()
 
     def _current_audio_path(self) -> Path:
         value = self.settings_form.audio_value

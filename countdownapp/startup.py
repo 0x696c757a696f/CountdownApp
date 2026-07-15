@@ -105,9 +105,22 @@ class StartupManager:
         command = self.registry.read(APP_RUN_NAME)
         if command is None:
             return StartupMode.OFF
-        if "--startup" in command:
+        normalized = command.strip().casefold()
+        if normalized == self.silent_command.strip().casefold():
             return StartupMode.SILENT
-        return StartupMode.VISIBLE
+        if normalized == self.visible_command.strip().casefold():
+            return StartupMode.VISIBLE
+        return StartupMode.OFF
+
+    def reconcile_mode(self) -> StartupMode:
+        """Remove a Run-key entry that points at a previous installation."""
+        command = self.registry.read(APP_RUN_NAME)
+        if command is None:
+            return StartupMode.OFF
+        mode = self.get_mode()
+        if mode is StartupMode.OFF:
+            self.registry.delete(APP_RUN_NAME)
+        return mode
 
     def set_mode(self, mode: StartupMode) -> None:
         if mode is StartupMode.OFF:

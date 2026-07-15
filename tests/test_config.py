@@ -142,6 +142,36 @@ class ConfigStoreTests(unittest.TestCase):
                 loaded.session.v2.fatigue_interval,
             )
 
+    def test_common_string_booleans_are_decoded_by_value(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            store = ConfigStore(path)
+            store.save(AppSettings(close_to_tray=True, show_next_reminder=False))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["behavior"]["close_to_tray"] = "false"
+            data["behavior"]["show_next_reminder"] = "true"
+            path.write_text(json.dumps(data), encoding="utf-8")
+
+            loaded = store.load()
+
+            self.assertFalse(loaded.close_to_tray)
+            self.assertTrue(loaded.show_next_reminder)
+
+    def test_schema_one_config_is_migrated_without_discarding_preferences(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            store = ConfigStore(path)
+            store.save(AppSettings(audio_choice="3.wav", ambient_volume=41))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["schema_version"] = 1
+            path.write_text(json.dumps(data), encoding="utf-8")
+
+            loaded = store.load()
+
+            self.assertEqual("3.wav", loaded.audio_choice)
+            self.assertEqual(41, loaded.ambient_volume)
+            self.assertEqual(2, loaded.schema_version)
+
     def test_invalid_config_is_preserved_before_defaults_are_returned(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

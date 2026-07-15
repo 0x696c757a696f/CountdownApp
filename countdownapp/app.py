@@ -26,6 +26,7 @@ from .domain import (
     reminder_coverage_warnings,
     validate_settings,
 )
+from .display import cover_virtual_desktop
 from .floating import FloatingStatusController, TkFloatingStatusView
 from .hotkeys import GlobalHotkeyService
 from .logging_config import configure_logging
@@ -126,7 +127,7 @@ class CountdownApp:
         self.audio = AudioEngine(logger=self.logger)
         self.startup_manager = StartupManager()
         try:
-            self.startup_mode = self.startup_manager.get_mode()
+            self.startup_mode = self.startup_manager.reconcile_mode()
         except OSError as error:
             self.logger.warning("Reading Windows startup setting failed: %s", error)
             self.startup_mode = StartupMode.OFF
@@ -1835,7 +1836,7 @@ class CountdownApp:
         window.overrideredirect(True)
         window.attributes("-topmost", True)
         window.configure(bg="black")
-        window.geometry(f"{window.winfo_screenwidth()}x{window.winfo_screenheight()}+0+0")
+        cover_virtual_desktop(window)
         if preset is ReminderPreset.BALANCED:
             window.attributes("-alpha", 0.82)
         label = tk.Label(
@@ -1871,6 +1872,8 @@ class CountdownApp:
             font=("Microsoft YaHei UI", 14),
         ).pack(side="left", padx=6)
         window.bind("<Escape>", lambda _event: self._close_reminder())
+        window.lift()
+        window.focus_force()
         deadline = time.monotonic() + duration_sec
         overlay_cache = RenderCache()
 

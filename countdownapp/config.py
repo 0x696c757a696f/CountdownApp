@@ -57,6 +57,7 @@ class ConfigStore:
             return AppSettings()
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
+            self._migrate_schema(data)
             self._normalize_legacy_shape(data)
             merged = self._merge_missing(self._encode(AppSettings()), data)
             return self._decode(merged)
@@ -176,14 +177,31 @@ class ConfigStore:
         def decode_range(raw: dict) -> IntervalRange:
             return IntervalRange(int(raw["minimum_sec"]), int(raw["maximum_sec"]))
 
+        def decode_bool(value: object, field_name: str) -> bool:
+            if isinstance(value, bool):
+                return value
+            if type(value) is int and value in (0, 1):
+                return bool(value)
+            if isinstance(value, str):
+                normalized = value.strip().casefold()
+                if normalized == "true":
+                    return True
+                if normalized == "false":
+                    return False
+            raise ValueError(f"Invalid boolean value for {field_name}")
+
         session = SessionSettings(
             focus_duration_sec=int(raw_session["focus_duration_sec"]),
             algorithm_mode=AlgorithmMode(raw_session["algorithm_mode"]),
             reminder_preset=ReminderPreset(raw_session["reminder_preset"]),
             microbreak_duration_sec=int(raw_session["microbreak_duration_sec"]),
-            break_countdown_enabled=bool(raw_session.get("break_countdown_enabled", True)),
-            adaptive_reminders_enabled=bool(
-                raw_session.get("adaptive_reminders_enabled", False)
+            break_countdown_enabled=decode_bool(
+                raw_session.get("break_countdown_enabled", True),
+                "session.break_countdown_enabled",
+            ),
+            adaptive_reminders_enabled=decode_bool(
+                raw_session.get("adaptive_reminders_enabled", False),
+                "session.adaptive_reminders_enabled",
             ),
             long_break_duration_sec=int(raw_session["long_break_duration_sec"]),
             classic_interval=decode_range(raw_session["classic_interval"]),
@@ -219,19 +237,28 @@ class ConfigStore:
             ambient_choice=ambient_choice,
             solfeggio_choice=solfeggio_choice,
             ambient_volume=max(0, min(100, int(ambient.get("volume", 20)))),
-            close_to_tray=bool(behavior.get("close_to_tray", True)),
-            show_next_reminder=bool(behavior.get("show_next_reminder", False)),
-            global_hotkeys_enabled=bool(
-                behavior.get("global_hotkeys_enabled", False)
+            close_to_tray=decode_bool(
+                behavior.get("close_to_tray", True), "behavior.close_to_tray"
             ),
-            floating_status_enabled=bool(
-                behavior.get("floating_status_enabled", False)
+            show_next_reminder=decode_bool(
+                behavior.get("show_next_reminder", False),
+                "behavior.show_next_reminder",
+            ),
+            global_hotkeys_enabled=decode_bool(
+                behavior.get("global_hotkeys_enabled", False),
+                "behavior.global_hotkeys_enabled",
+            ),
+            floating_status_enabled=decode_bool(
+                behavior.get("floating_status_enabled", False),
+                "behavior.floating_status_enabled",
             ),
             floating_x=optional_int(behavior.get("floating_x")),
             floating_y=optional_int(behavior.get("floating_y")),
             pause_hotkey=str(behavior.get("pause_hotkey", "Alt+Shift+P")),
             window_hotkey=str(behavior.get("window_hotkey", "Alt+Shift+O")),
-            migration_completed=bool(data.get("migration_completed", False)),
+            migration_completed=decode_bool(
+                data.get("migration_completed", False), "migration_completed"
+            ),
             schema_version=SCHEMA_VERSION,
         )
 
@@ -258,6 +285,17 @@ class ConfigStore:
         if isinstance(choice, str) and choice.startswith("tone:"):
             ambient["solfeggio_choice"] = choice
             ambient["choice"] = "off"
+
+    @staticmethod
+    def _migrate_schema(data: dict) -> None:
+        if not isinstance(data, dict):
+            raise TypeError("Settings root must be an object")
+        version = int(data.get("schema_version", 1))
+        if version == 1:
+            data["schema_version"] = SCHEMA_VERSION
+            return
+        if version != SCHEMA_VERSION:
+            raise ValueError("Unsupported settings schema")
 
     def _preserve_invalid_config(self) -> Path | None:
         if not self.path.exists():

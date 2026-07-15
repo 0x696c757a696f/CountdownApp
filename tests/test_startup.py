@@ -57,6 +57,31 @@ class StartupManagerTests(unittest.TestCase):
             silent,
         )
 
+    def test_reconcile_removes_a_stale_command_from_an_old_install(self):
+        registry = MemoryRegistry()
+        registry.values["CountdownApp"] = '"C:\\Old\\CountdownApp.exe" --startup'
+        manager = StartupManager(
+            visible_command='"C:\\New\\CountdownApp.exe"',
+            silent_command='"C:\\New\\CountdownApp.exe" --startup',
+            registry=registry,
+        )
+
+        self.assertEqual(StartupMode.OFF, manager.reconcile_mode())
+        self.assertNotIn("CountdownApp", registry.values)
+
+    def test_reconcile_preserves_the_current_visible_and_silent_commands(self):
+        registry = MemoryRegistry()
+        manager = StartupManager(
+            visible_command='"C:\\Apps\\CountdownApp.exe"',
+            silent_command='"C:\\Apps\\CountdownApp.exe" --startup',
+            registry=registry,
+        )
+
+        manager.set_mode(StartupMode.VISIBLE)
+        self.assertEqual(StartupMode.VISIBLE, manager.reconcile_mode())
+        manager.set_mode(StartupMode.SILENT)
+        self.assertEqual(StartupMode.SILENT, manager.reconcile_mode())
+
     def test_only_a_startup_launch_with_a_working_tray_starts_hidden(self):
         self.assertTrue(should_start_hidden(["app.exe", "--startup"], tray_ready=True))
         self.assertFalse(should_start_hidden(["app.exe"], tray_ready=True))

@@ -31,51 +31,71 @@ class SettingsActionLayoutTests(unittest.TestCase):
             yield child
             yield from SettingsActionLayoutTests._descendants(child)
 
+    def _button(self, text):
+        return next(
+            widget
+            for widget in self._descendants(self.app.settings_view.frame)
+            if isinstance(widget, ttk.Button) and widget.cget("text") == text
+        )
+
     def test_v2_and_more_settings_actions_share_one_horizontal_row(self):
-        v2_y = self.app.v2_settings_button.winfo_rooty()
-        more_y = self.app.more_button.winfo_rooty()
+        v2_y = self._button("调整 V2").winfo_rooty()
+        more_y = self._button("更多设置 ▾").winfo_rooty()
 
         self.assertLessEqual(abs(v2_y - more_y), 2)
 
     def test_primary_settings_actions_are_fully_visible_without_scrolling(self):
         self.root.geometry("720x690+80+80")
         self.root.update()
+        canvas = next(
+            widget
+            for widget in self._descendants(self.app.settings_view.frame)
+            if isinstance(widget, tk.Canvas)
+        )
+        more_button = self._button("更多设置 ▾")
         viewport_bottom = (
-            self.app.basic_canvas.winfo_rooty()
-            + self.app.basic_canvas.winfo_height()
+            canvas.winfo_rooty()
+            + canvas.winfo_height()
         )
         action_bottom = (
-            self.app.more_button.winfo_rooty() + self.app.more_button.winfo_height()
+            more_button.winfo_rooty() + more_button.winfo_height()
         )
 
         self.assertLessEqual(action_bottom, viewport_bottom)
 
     def test_more_settings_action_remains_visible_in_classic_mode(self):
         self.app.algorithm_var.set("Classic")
-        self.app._refresh_algorithm_controls()
+        self.app.settings_view.refresh_algorithm()
         self.root.update_idletasks()
 
-        self.assertFalse(self.app.v2_settings_button.winfo_ismapped())
-        self.assertTrue(self.app.more_button.winfo_ismapped())
+        self.assertFalse(self._button("调整 V2").winfo_ismapped())
+        self.assertTrue(self._button("更多设置 ▾").winfo_ismapped())
 
     def test_expanding_more_settings_keeps_the_collapse_action_visible(self):
         self.root.geometry("720x690+80+80")
         self.root.update()
 
-        self.app._toggle_more_settings()
+        self._button("更多设置 ▾").invoke()
         self.root.update()
-
-        viewport_top = self.app.basic_canvas.winfo_rooty()
-        viewport_bottom = viewport_top + self.app.basic_canvas.winfo_height()
-        button_top = self.app.more_button.winfo_rooty()
-        button_bottom = button_top + self.app.more_button.winfo_height()
+        canvas = next(
+            widget
+            for widget in self._descendants(self.app.settings_view.frame)
+            if isinstance(widget, tk.Canvas)
+        )
+        collapse = self._button("收起更多设置 ▴")
+        viewport_top = canvas.winfo_rooty()
+        viewport_bottom = viewport_top + canvas.winfo_height()
+        button_top = collapse.winfo_rooty()
+        button_bottom = button_top + collapse.winfo_height()
         self.assertGreaterEqual(button_top, viewport_top)
         self.assertLessEqual(button_bottom, viewport_bottom)
 
     def test_adaptive_feedback_setting_explains_buttons_and_effect(self):
+        self._button("更多设置 ▾").invoke()
+        self.root.update_idletasks()
         labels = {
             widget.cget("text")
-            for widget in self._descendants(self.app.more_frame)
+            for widget in self._descendants(self.app.settings_view.frame)
             if isinstance(widget, (ttk.Label, ttk.Checkbutton))
         }
 
@@ -113,7 +133,7 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertGreaterEqual(window.winfo_height(), body.winfo_reqheight())
 
     def test_runtime_ambient_controls_are_compact_until_requested(self):
-        self.app.settings_frame.pack_forget()
+        self.app.settings_view.hide()
         self.app.runtime_view.show_focus("已关闭")
         self.assertFalse(self.app.runtime_view.ambient_controls_expanded)
 
@@ -130,7 +150,7 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertEqual((600, 460), (self.root.winfo_width(), self.root.winfo_height()))
 
     def test_timer_and_session_details_share_the_dashboard_row(self):
-        self.app.settings_frame.pack_forget()
+        self.app.settings_view.hide()
         self.app.runtime_view.show_focus("已关闭")
         self.app.runtime_view.render(
             RuntimeDisplay("56:42", "深度专注期", "当前基础随机区间：10–15 分钟")
@@ -147,7 +167,7 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertLess(abs(timer_y - phase_y), 80)
 
     def test_runtime_actions_use_two_aligned_button_rows(self):
-        self.app.settings_frame.pack_forget()
+        self.app.settings_view.hide()
         self.app.runtime_view.show_focus("粉红噪音 · 20%")
         self.app._toggle_runtime_ambient_controls()
         self.root.update_idletasks()
@@ -187,7 +207,7 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertEqual(460, self.root.minsize()[1])
 
     def test_break_prompt_expands_to_show_every_action(self):
-        self.app.settings_frame.pack_forget()
+        self.app.settings_view.hide()
         self.app.break_prompt_frame.pack(fill="both", expand=True)
 
         self.app._apply_break_prompt_window_layout()

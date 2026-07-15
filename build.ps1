@@ -1,10 +1,12 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$PythonExecutable = ""
+)
 
 $ErrorActionPreference = "Stop"
 
 $projectRoot = $PSScriptRoot
-$pyinstaller = Join-Path $projectRoot ".venv\Scripts\pyinstaller.exe"
+$defaultPython = Join-Path $projectRoot ".venv\Scripts\python.exe"
 $spec = Join-Path $projectRoot "countdown_app.spec"
 $workPath = Join-Path $projectRoot ".pyinstaller-build"
 $distPath = Join-Path $projectRoot "dist"
@@ -13,8 +15,19 @@ $outputDir = Split-Path -Parent $outputExe
 $legacyOutputDir = Join-Path $distPath "CountdownApp"
 $legacyOutputExe = Join-Path $legacyOutputDir "CountdownApp.exe"
 
-if (-not (Test-Path -LiteralPath $pyinstaller -PathType Leaf)) {
-    throw "PyInstaller was not found in .venv. Run: .\.venv\Scripts\python -m pip install -r requirements-dev.txt"
+if ([string]::IsNullOrWhiteSpace($PythonExecutable)) {
+    $PythonExecutable = $defaultPython
+}
+try {
+    $pythonCommand = Get-Command $PythonExecutable -ErrorAction Stop
+    $python = $pythonCommand.Source
+}
+catch {
+    throw "Python was not found: $PythonExecutable"
+}
+& $python -c "import PyInstaller" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller is not installed for $python. Install requirements-dev.txt into that environment."
 }
 
 $runningApp = Get-CimInstance Win32_Process | Where-Object {
@@ -51,7 +64,7 @@ try {
         Remove-Item -LiteralPath $resolvedLegacy -Recurse -Force
     }
 
-    & $pyinstaller `
+    & $python -m PyInstaller `
         --noconfirm `
         --clean `
         --workpath $workPath `

@@ -21,3 +21,22 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Run tests
         run: python -m unittest discover -v
+
+  build-onefile:
+    needs: windows-python-314
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install build dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Build onefile executable
+        shell: powershell
+        run: .\build.ps1 -PythonExecutable python
+      - name: Verify isolated first launch
+        shell: powershell
+        run: .\scripts\smoke_onefile.ps1 -Executable .\dist\CountdownApp.exe -ExpectedVersion 2.2.0

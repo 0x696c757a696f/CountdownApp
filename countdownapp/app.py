@@ -15,6 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import __version__
 from .adaptive import AttentionFeedback
+from .ambient_async import AsyncAmbientController
 from .audio import AudioEngine, should_play_return_bell
 from .config import AppSettings, ConfigStore
 from .domain import (
@@ -133,6 +134,12 @@ class CountdownApp:
                 self.store.last_save_error,
             )
         self.audio = AudioEngine(logger=self.logger)
+        self.gui_callbacks: "queue.Queue[Callable[[], None]]" = queue.Queue()
+        self.ambient_tasks = AsyncAmbientController(
+            self.audio.play_prepared_ambient,
+            self.gui_callbacks.put,
+            logger=self.logger,
+        )
         self.startup_manager = StartupManager()
         try:
             self.startup_mode = self.startup_manager.reconcile_mode()
@@ -565,7 +572,7 @@ class CountdownApp:
             ambient_section, text="试听组合", command=self._preview_ambient
         ).grid(row=0, column=2, padx=4, pady=4)
         ttk.Button(
-            ambient_section, text="停止", command=self.audio.stop_ambient
+            ambient_section, text="停止", command=self._stop_ambient_playback
         ).grid(row=0, column=3, pady=4)
 
         ttk.Label(ambient_section, text="Solfeggio 频率", style="Form.TLabel").grid(
@@ -1340,15 +1347,28 @@ class CountdownApp:
         return min(1.0, max(0.0, self.ambient_volume_var.get() / 100.0))
 
     def _play_ambient_selection(
-        self, noise: str, tone: str, volume: float
-    ) -> bool:
-        played = self.audio.play_ambient(noise, tone, volume)
-        if not played and (noise != "off" or tone != "off"):
-            messagebox.showwarning(
-                "背景音播放失败",
-                "无法启动所选背景音。选择已保留，程序会在下次操作时重试；详情请查看 Logs。",
-            )
-        return played
+        self,
+        noise: str,
+        tone: str,
+        volume: float,
+        on_complete: Callable[[bool], None] | None = None,
+    ) -> None:
+        if noise == "off" and tone == "off":
+            self._stop_ambient_playback()
+            if on_complete is not None:
+                on_complete(True)
+            return
+
+        def completed(played: bool) -> None:
+            if not played:
+                messagebox.showwarning(
+                    "背景音播放失败",
+                    "无法启动所选背景音。选择已保留，程序会在下次操作时重试；详情请查看 Logs。",
+                )
+            if on_complete is not None:
+                on_complete(played)
+
+        self.ambient_tasks.request(noise, tone, volume, completed)
 
     def _preview_ambient(self) -> None:
         self._play_ambient_selection(
@@ -1361,15 +1381,35 @@ class CountdownApp:
         noise = self._current_ambient_value()
         tone = self._current_solfeggio_value()
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
-        played = self._play_ambient_selection(noise, tone, volume / 100.0)
-        if self.session is not None and self.session.state is SessionState.PAUSED:
-            self.audio.pause_ambient()
-
         self._save_runtime_ambient_preferences()
+        if noise != "off" or tone != "off":
+            self.runtime_ambient_summary_var.set("正在准备背景音…")
+        self._play_ambient_selection(
+            noise,
+            tone,
+            volume / 100.0,
+            lambda played: self._runtime_ambient_completed(
+                noise, tone, volume, played
+            ),
+        )
+
+    def _runtime_ambient_completed(
+        self, noise: str, tone: str, volume: int, played: bool
+    ) -> None:
+        if played and self.session is not None and self.session.state is SessionState.PAUSED:
+            self.audio.pause_ambient()
         if not played:
             self.runtime_ambient_summary_var.set(
                 "播放失败 · 已保留选择，等待下次重试"
             )
+        else:
+            self.runtime_ambient_summary_var.set(
+                format_ambient_summary(noise, tone, volume)
+            )
+
+    def _stop_ambient_playback(self) -> None:
+        self.ambient_tasks.cancel()
+        self.audio.stop_ambient()
 
     def _save_runtime_ambient_preferences(self) -> None:
         noise = self._current_ambient_value()
@@ -1395,6 +1435,7 @@ class CountdownApp:
     def _on_runtime_ambient_volume_changed(self, value: str) -> None:
         volume = min(100, max(0, round(float(value))))
         self.ambient_volume_label_var.set(f"{volume}%")
+        self.ambient_tasks.set_volume(volume / 100.0)
         self.audio.set_ambient_volume(volume / 100.0)
         self.runtime_ambient_summary_var.set(
             format_ambient_summary(
@@ -1453,6 +1494,7 @@ class CountdownApp:
     def _on_ambient_volume_changed(self, value: str) -> None:
         volume = min(100, max(0, round(float(value))))
         self.ambient_volume_label_var.set(f"{volume}%")
+        self.ambient_tasks.set_volume(volume / 100.0)
         self.audio.set_ambient_volume(volume / 100.0)
 
     def _choose_audio(self, is_return: bool) -> None:
@@ -1688,7 +1730,7 @@ class CountdownApp:
     def _show_break_prompt(self) -> None:
         self._close_reminder(dismiss=False)
         self.audio.stop_bell()
-        self.audio.stop_ambient()
+        self._stop_ambient_playback()
         self.floating_status.end_session()
         self.running_frame.pack_forget()
         self.runtime_ambient_controls.pack_forget()
@@ -1749,7 +1791,7 @@ class CountdownApp:
             self.tick_after_id = None
         self._close_reminder(dismiss=False)
         self.audio.stop_bell()
-        self.audio.stop_ambient()
+        self._stop_ambient_playback()
         self.floating_status.end_session()
         self.running_frame.pack_forget()
         self.break_prompt_frame.pack_forget()
@@ -1969,7 +2011,7 @@ class CountdownApp:
     def _minimize_to_tray(self) -> None:
         if self.tray.available:
             if self.session is None or self.session.state is SessionState.IDLE:
-                self.audio.stop_ambient()
+                self._stop_ambient_playback()
             self.root.withdraw()
         else:
             messagebox.showwarning("托盘不可用", "系统托盘初始化失败，窗口不能隐藏。")
@@ -1989,6 +2031,11 @@ class CountdownApp:
     def _poll_tray(self) -> None:
         self.tray_after_id = None
         self.hotkeys.poll()
+        try:
+            while True:
+                self.gui_callbacks.get_nowait()()
+        except queue.Empty:
+            pass
         try:
             while True:
                 command = self.tray_commands.get_nowait()
@@ -2037,6 +2084,7 @@ class CountdownApp:
             self.tray_after_id = None
         self._close_reminder(dismiss=False)
         self.floating_status.close()
+        self.ambient_tasks.close()
         self.audio.close()
         self.hotkeys.stop()
         self.tray.stop()

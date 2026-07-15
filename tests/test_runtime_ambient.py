@@ -30,6 +30,26 @@ class AudioStub:
     def pause_ambient(self):
         self.events.append(("pause",))
 
+    def stop_ambient(self):
+        self.events.append(("stop",))
+
+
+class AmbientTaskStub:
+    def __init__(self, play_result=True):
+        self.events = []
+        self.play_result = play_result
+
+    def request(self, noise, tone, volume, on_complete=None):
+        self.events.append(("request", noise, tone, volume))
+        if on_complete is not None:
+            on_complete(self.play_result)
+
+    def cancel(self):
+        self.events.append(("cancel",))
+
+    def set_volume(self, volume):
+        self.events.append(("volume", volume))
+
 
 class StoreStub:
     def __init__(self):
@@ -44,6 +64,7 @@ class RuntimeAmbientTests(unittest.TestCase):
     def make_app(state=SessionState.FOCUSING, play_result=True):
         app = CountdownApp.__new__(CountdownApp)
         app.audio = AudioStub(play_result)
+        app.ambient_tasks = AmbientTaskStub(play_result)
         app.store = StoreStub()
         app.app_settings = AppSettings()
         app.session = SimpleNamespace(state=state)
@@ -59,7 +80,11 @@ class RuntimeAmbientTests(unittest.TestCase):
 
         app._apply_runtime_ambient()
 
-        self.assertEqual([("play", "pink", "tone:528", 0.35)], app.audio.events)
+        self.assertEqual(
+            [("request", "pink", "tone:528", 0.35)],
+            app.ambient_tasks.events,
+        )
+        self.assertEqual([], app.audio.events)
         self.assertEqual("pink", app.app_settings.ambient_choice)
         self.assertEqual("tone:528", app.app_settings.solfeggio_choice)
         self.assertEqual(35, app.app_settings.ambient_volume)
@@ -75,9 +100,19 @@ class RuntimeAmbientTests(unittest.TestCase):
         app._apply_runtime_ambient()
 
         self.assertEqual(
-            [("play", "pink", "tone:528", 0.35), ("pause",)],
+            [("pause",)],
             app.audio.events,
         )
+
+    def test_turning_background_audio_off_cancels_pending_rendering(self):
+        app = self.make_app()
+        app.ambient_var.set("关闭")
+        app.solfeggio_var.set("关闭")
+
+        app._apply_runtime_ambient()
+
+        self.assertEqual([("cancel",)], app.ambient_tasks.events)
+        self.assertEqual([("stop",)], app.audio.events)
 
     def test_failed_runtime_playback_is_visible_instead_of_claiming_success(self):
         app = self.make_app(play_result=False)

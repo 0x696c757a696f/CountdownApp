@@ -1,5 +1,7 @@
 import unittest
+from array import array
 
+from countdownapp.ambient_async import PreparedAmbient
 from countdownapp.audio import AudioEngine, should_play_return_bell
 
 
@@ -34,6 +36,19 @@ class RecordingEngineBackend:
         if self.fail_ambient:
             raise RuntimeError("ambient device changed")
 
+    def play_prepared_ambient(self, prepared, volume):
+        self.events.append(
+            (
+                "play_prepared_ambient",
+                prepared.sources,
+                prepared.samples.tolist(),
+                prepared.sample_rate,
+                volume,
+            )
+        )
+        if self.fail_ambient:
+            raise RuntimeError("ambient device changed")
+
     def set_ambient_volume(self, volume):
         self.events.append(("ambient_volume", volume))
         if self.fail_volume:
@@ -55,6 +70,29 @@ class RecordingEngineBackend:
 
 
 class AudioEngineTests(unittest.TestCase):
+    def test_prepared_mix_reaches_the_backend_without_synthesizing_again(self):
+        backend = RecordingEngineBackend()
+        engine = AudioEngine(backend_factory=lambda: backend)
+        prepared = PreparedAmbient(
+            ("pink", "tone:528"), array("h", [10, -10]), 44_100
+        )
+
+        played = engine.play_prepared_ambient(prepared, 0.35)
+
+        self.assertTrue(played)
+        self.assertEqual(
+            [
+                (
+                    "play_prepared_ambient",
+                    ("pink", "tone:528"),
+                    [10, -10],
+                    44_100,
+                    0.35,
+                )
+            ],
+            backend.events,
+        )
+
     def test_bell_temporarily_ducks_and_then_restores_ambient_audio(self):
         backend = RecordingEngineBackend()
         engine = AudioEngine(backend_factory=lambda: backend, ducking_ratio=0.25)

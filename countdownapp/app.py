@@ -19,15 +19,12 @@ from .ambient_async import AsyncAmbientController
 from .audio import AudioEngine, should_play_return_bell
 from .config import AppSettings, ConfigStore
 from .domain import (
-    AlgorithmMode,
     IntervalRange,
     ReminderPreset,
     SessionSettings,
     SessionState,
     V2Phase,
-    V2Settings,
     reminder_coverage_warnings,
-    validate_settings,
 )
 from .floating import FloatingStatusController, TkFloatingStatusView
 from .hotkeys import GlobalHotkeyService
@@ -50,6 +47,12 @@ from .reminder_view import (
 )
 from .runtime_view import RuntimeBindings, RuntimeDisplay, RuntimeView
 from .session import FocusSession, RuntimeEventKind
+from .settings_form import (
+    AUDIO_OPTIONS,
+    NOISE_OPTIONS,
+    SOLFEGGIO_OPTIONS,
+    SettingsForm,
+)
 from .single_instance import SingleInstanceGuard, show_native_message
 from .startup import StartupManager, StartupMode, should_start_hidden
 from .tray import TrayService
@@ -62,40 +65,10 @@ PHASE_NAMES = {
     V2Phase.FATIGUE_SUPPORT: "疲劳维护期",
 }
 
-AUDIO_OPTIONS = {
-    "提示音 0": "0.wav",
-    "提示音 1": "1.wav",
-    "提示音 2": "2.wav",
-    "提示音 3": "3.wav",
-    "提示音 4": "4.mp3",
-    "自定义音频": "custom",
-}
-
 STARTUP_OPTIONS = {
     "关闭": StartupMode.OFF,
     "开机启动（显示主界面）": StartupMode.VISIBLE,
     "开机静默启动（仅显示托盘图标）": StartupMode.SILENT,
-}
-
-NOISE_OPTIONS = {
-    "关闭": "off",
-    "白噪音": "white",
-    "粉红噪音": "pink",
-    "棕噪音（低频更强）": "brown",
-    "灰噪音（近似等响度）": "grey",
-}
-
-SOLFEGGIO_OPTIONS = {
-    "关闭": "off",
-    "Solfeggio 174 Hz": "tone:174",
-    "Solfeggio 285 Hz": "tone:285",
-    "Solfeggio 396 Hz": "tone:396",
-    "Solfeggio 417 Hz": "tone:417",
-    "Solfeggio 528 Hz": "tone:528",
-    "Solfeggio 639 Hz": "tone:639",
-    "Solfeggio 741 Hz": "tone:741",
-    "Solfeggio 852 Hz": "tone:852",
-    "Solfeggio 963 Hz": "tone:963",
 }
 
 PAUSE_HOTKEY_PRESETS = (
@@ -323,38 +296,37 @@ class CountdownApp:
         self.settings_frame.columnconfigure(0, weight=1)
         self.settings_frame.rowconfigure(2, weight=1)
 
-        self.total_var = tk.StringVar()
-        self.algorithm_var = tk.StringVar()
-        self.classic_min_var = tk.StringVar()
-        self.classic_max_var = tk.StringVar()
-        self.anchor_end_var = tk.StringVar()
-        self.fatigue_start_var = tk.StringVar()
-        self.anchor_min_var = tk.StringVar()
-        self.anchor_max_var = tk.StringVar()
-        self.deep_min_var = tk.StringVar()
-        self.deep_max_var = tk.StringVar()
-        self.fatigue_min_var = tk.StringVar()
-        self.fatigue_max_var = tk.StringVar()
-        self.preset_var = tk.StringVar()
-        self.microbreak_var = tk.StringVar()
-        self.break_countdown_var = tk.BooleanVar()
-        self.adaptive_var = tk.BooleanVar()
-        self.long_break_var = tk.StringVar()
-        self.audio_var = tk.StringVar()
-        self.return_audio_var = tk.StringVar()
-        self.ambient_var = tk.StringVar()
-        self.solfeggio_var = tk.StringVar()
-        self.ambient_volume_var = tk.DoubleVar()
-        self.ambient_volume_label_var = tk.StringVar()
-        self.close_to_tray_var = tk.BooleanVar()
-        self.show_next_reminder_var = tk.BooleanVar()
-        self.global_hotkeys_var = tk.BooleanVar()
-        self.floating_status_var = tk.BooleanVar()
-        self.pause_hotkey_var = tk.StringVar()
-        self.window_hotkey_var = tk.StringVar()
+        self.settings_form = SettingsForm(self.root)
+        self.total_var = self.settings_form.total
+        self.algorithm_var = self.settings_form.algorithm
+        self.classic_min_var = self.settings_form.classic_min
+        self.classic_max_var = self.settings_form.classic_max
+        self.anchor_end_var = self.settings_form.anchor_end
+        self.fatigue_start_var = self.settings_form.fatigue_start
+        self.anchor_min_var = self.settings_form.anchor_min
+        self.anchor_max_var = self.settings_form.anchor_max
+        self.deep_min_var = self.settings_form.deep_min
+        self.deep_max_var = self.settings_form.deep_max
+        self.fatigue_min_var = self.settings_form.fatigue_min
+        self.fatigue_max_var = self.settings_form.fatigue_max
+        self.preset_var = self.settings_form.preset
+        self.microbreak_var = self.settings_form.microbreak
+        self.break_countdown_var = self.settings_form.break_countdown
+        self.adaptive_var = self.settings_form.adaptive
+        self.long_break_var = self.settings_form.long_break
+        self.audio_var = self.settings_form.audio
+        self.return_audio_var = self.settings_form.return_audio
+        self.ambient_var = self.settings_form.ambient
+        self.solfeggio_var = self.settings_form.solfeggio
+        self.ambient_volume_var = self.settings_form.ambient_volume
+        self.ambient_volume_label_var = self.settings_form.ambient_volume_label
+        self.close_to_tray_var = self.settings_form.close_to_tray
+        self.show_next_reminder_var = self.settings_form.show_next_reminder
+        self.global_hotkeys_var = self.settings_form.global_hotkeys
+        self.floating_status_var = self.settings_form.floating_status
+        self.pause_hotkey_var = self.settings_form.pause_hotkey
+        self.window_hotkey_var = self.settings_form.window_hotkey
         self.startup_var = tk.StringVar()
-        self.custom_audio_path = ""
-        self.return_custom_audio_path = ""
 
         self.basic_canvas = tk.Canvas(
             self.settings_frame,
@@ -762,64 +734,7 @@ class CountdownApp:
         return "break"
 
     def _load_form(self, settings: AppSettings) -> None:
-        session = settings.session
-        self.total_var.set(self._number(session.focus_duration_sec / 60))
-        self.algorithm_var.set("V2" if session.algorithm_mode is AlgorithmMode.V2 else "Classic")
-        self.classic_min_var.set(self._number(session.classic_interval.minimum_sec / 60))
-        self.classic_max_var.set(self._number(session.classic_interval.maximum_sec / 60))
-        self.anchor_end_var.set(self._number(session.v2.anchor_end_sec / 60))
-        self.fatigue_start_var.set(self._number(session.v2.fatigue_start_sec / 60))
-        self.anchor_min_var.set(self._number(session.v2.anchor_interval.minimum_sec / 60))
-        self.anchor_max_var.set(self._number(session.v2.anchor_interval.maximum_sec / 60))
-        self.deep_min_var.set(self._number(session.v2.deep_focus_interval.minimum_sec / 60))
-        self.deep_max_var.set(self._number(session.v2.deep_focus_interval.maximum_sec / 60))
-        self.fatigue_min_var.set(self._number(session.v2.fatigue_interval.minimum_sec / 60))
-        self.fatigue_max_var.set(self._number(session.v2.fatigue_interval.maximum_sec / 60))
-        self.preset_var.set("强干预" if session.reminder_preset is ReminderPreset.STRONG else "平衡")
-        self.microbreak_var.set(str(session.microbreak_duration_sec))
-        self.break_countdown_var.set(session.break_countdown_enabled)
-        self.adaptive_var.set(session.adaptive_reminders_enabled)
-        self.long_break_var.set(self._number(session.long_break_duration_sec / 60))
-        selected_name = next(
-            (name for name, value in AUDIO_OPTIONS.items() if value == settings.audio_choice),
-            "提示音 0",
-        )
-        self.audio_var.set(selected_name)
-        self.custom_audio_path = settings.custom_audio_path
-        return_selected_name = next(
-            (name for name, value in AUDIO_OPTIONS.items() if value == settings.return_audio_choice),
-            "提示音 1",
-        )
-        self.return_audio_var.set(return_selected_name)
-        self.return_custom_audio_path = settings.return_custom_audio_path
-        self.ambient_var.set(
-            next(
-                (
-                    name
-                    for name, value in NOISE_OPTIONS.items()
-                    if value == settings.ambient_choice
-                ),
-                "关闭",
-            )
-        )
-        self.solfeggio_var.set(
-            next(
-                (
-                    name
-                    for name, value in SOLFEGGIO_OPTIONS.items()
-                    if value == settings.solfeggio_choice
-                ),
-                "关闭",
-            )
-        )
-        self.ambient_volume_var.set(settings.ambient_volume)
-        self.ambient_volume_label_var.set(f"{settings.ambient_volume}%")
-        self.close_to_tray_var.set(settings.close_to_tray)
-        self.show_next_reminder_var.set(settings.show_next_reminder)
-        self.global_hotkeys_var.set(settings.global_hotkeys_enabled)
-        self.floating_status_var.set(settings.floating_status_enabled)
-        self.pause_hotkey_var.set(settings.pause_hotkey)
-        self.window_hotkey_var.set(settings.window_hotkey)
+        self.settings_form.load(settings)
         self._refresh_hotkey_controls()
         self.startup_var.set(
             next(
@@ -831,10 +746,6 @@ class CountdownApp:
         self._refresh_algorithm_controls()
         self._refresh_runtime_ambient_summary()
 
-    @staticmethod
-    def _number(value: float) -> str:
-        return str(int(value)) if float(value).is_integer() else f"{value:.2f}".rstrip("0")
-
     def _set_duration_preset(self, minutes: int) -> None:
         self.total_var.set(str(minutes))
         self.algorithm_var.set("V2" if minutes >= 60 else "Classic")
@@ -842,18 +753,10 @@ class CountdownApp:
 
     def _reset_v2_defaults(self) -> None:
         try:
-            total = self._minutes(self.total_var.get(), "总专注时间")
+            self.settings_form.reset_v2_defaults()
         except ValueError as error:
             self.form_error.config(text=str(error))
             return
-        self.anchor_end_var.set(self._number(total / 3 / 60))
-        self.fatigue_start_var.set(self._number(total * 13 / 18 / 60))
-        self.anchor_min_var.set("4")
-        self.anchor_max_var.set("7")
-        self.deep_min_var.set("10")
-        self.deep_max_var.set("15")
-        self.fatigue_min_var.set("5")
-        self.fatigue_max_var.set("8")
         if hasattr(self, "v2_summary_var"):
             self._refresh_algorithm_controls()
 
@@ -1115,99 +1018,21 @@ class CountdownApp:
                 pass
         self._refresh_algorithm_controls()
 
-    def _build_settings_from_form(self) -> SessionSettings:
-        total = self._minutes(self.total_var.get(), "总专注时间")
-        mode = AlgorithmMode.V2 if self.algorithm_var.get() == "V2" else AlgorithmMode.CLASSIC
-        settings = SessionSettings(
-            focus_duration_sec=total,
-            algorithm_mode=mode,
-            classic_interval=IntervalRange(
-                self._minutes(self.classic_min_var.get(), "Classic 最小间隔"),
-                self._minutes(self.classic_max_var.get(), "Classic 最大间隔"),
-            ),
-            v2=V2Settings(
-                anchor_end_sec=self._minutes(self.anchor_end_var.get(), "锚定期结束"),
-                fatigue_start_sec=self._minutes(self.fatigue_start_var.get(), "疲劳期开始"),
-                anchor_interval=IntervalRange(
-                    self._minutes(self.anchor_min_var.get(), "锚定期最小间隔"),
-                    self._minutes(self.anchor_max_var.get(), "锚定期最大间隔"),
-                ),
-                deep_focus_interval=IntervalRange(
-                    self._minutes(self.deep_min_var.get(), "深度期最小间隔"),
-                    self._minutes(self.deep_max_var.get(), "深度期最大间隔"),
-                ),
-                fatigue_interval=IntervalRange(
-                    self._minutes(self.fatigue_min_var.get(), "疲劳期最小间隔"),
-                    self._minutes(self.fatigue_max_var.get(), "疲劳期最大间隔"),
-                ),
-            ),
-            reminder_preset=(
-                ReminderPreset.STRONG if self.preset_var.get() == "强干预" else ReminderPreset.BALANCED
-            ),
-            microbreak_duration_sec=self._positive_int(self.microbreak_var.get(), "微休息"),
-            break_countdown_enabled=self.break_countdown_var.get(),
-            long_break_duration_sec=self._minutes(self.long_break_var.get(), "大休息"),
-            adaptive_reminders_enabled=self.adaptive_var.get(),
-        )
-        errors = validate_settings(settings)
-        if errors:
-            raise ValueError("\n".join(errors))
-        if AUDIO_OPTIONS.get(self.audio_var.get()) == "custom":
-            custom = Path(self.custom_audio_path)
-            if not custom.is_file() or custom.suffix.lower() not in {".wav", ".ogg", ".mp3"}:
-                raise ValueError("自定义开始铃不存在或格式不受支持。")
-        if AUDIO_OPTIONS.get(self.return_audio_var.get()) == "custom":
-            custom = Path(self.return_custom_audio_path)
-            if not custom.is_file() or custom.suffix.lower() not in {".wav", ".ogg", ".mp3"}:
-                raise ValueError("自定义回归铃不存在或格式不受支持。")
-        return settings
-
-    @staticmethod
-    def _minutes(value: str, label: str) -> int:
-        try:
-            number = float(value.strip())
-        except (TypeError, ValueError):
-            raise ValueError(f"{label}必须是数字。") from None
-        if not math.isfinite(number) or number <= 0:
-            raise ValueError(f"{label}必须大于 0。")
-        return max(1, round(number * 60))
-
-    @staticmethod
-    def _positive_int(value: str, label: str) -> int:
-        try:
-            number = int(value.strip())
-        except (TypeError, ValueError):
-            raise ValueError(f"{label}必须是整数。") from None
-        if number <= 0:
-            raise ValueError(f"{label}必须大于 0。")
-        return number
-
-    def _current_audio_value(self) -> str:
-        return AUDIO_OPTIONS.get(self.audio_var.get(), "0.wav")
-
     def _current_audio_path(self) -> Path:
-        value = self._current_audio_value()
-        return Path(self.custom_audio_path) if value == "custom" else resource_path(value)
-
-    def _current_return_audio_value(self) -> str:
-        return AUDIO_OPTIONS.get(self.return_audio_var.get(), "1.wav")
-
-    def _current_return_audio_path(self) -> Path:
-        value = self._current_return_audio_value()
+        value = self.settings_form.audio_value
         return (
-            Path(self.return_custom_audio_path)
+            Path(self.settings_form.custom_audio_path)
             if value == "custom"
             else resource_path(value)
         )
 
-    def _current_ambient_value(self) -> str:
-        return NOISE_OPTIONS.get(self.ambient_var.get(), "off")
-
-    def _current_solfeggio_value(self) -> str:
-        return SOLFEGGIO_OPTIONS.get(self.solfeggio_var.get(), "off")
-
-    def _ambient_volume(self) -> float:
-        return min(1.0, max(0.0, self.ambient_volume_var.get() / 100.0))
+    def _current_return_audio_path(self) -> Path:
+        value = self.settings_form.return_audio_value
+        return (
+            Path(self.settings_form.return_custom_audio_path)
+            if value == "custom"
+            else resource_path(value)
+        )
 
     def _play_ambient_selection(
         self,
@@ -1235,14 +1060,14 @@ class CountdownApp:
 
     def _preview_ambient(self) -> None:
         self._play_ambient_selection(
-            self._current_ambient_value(),
-            self._current_solfeggio_value(),
-            self._ambient_volume(),
+            self.settings_form.ambient_value,
+            self.settings_form.solfeggio_value,
+            self.settings_form.ambient_volume_fraction,
         )
 
     def _apply_runtime_ambient(self) -> None:
-        noise = self._current_ambient_value()
-        tone = self._current_solfeggio_value()
+        noise = self.settings_form.ambient_value
+        tone = self.settings_form.solfeggio_value
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
         self._save_runtime_ambient_preferences()
         if noise != "off" or tone != "off":
@@ -1275,8 +1100,8 @@ class CountdownApp:
         self.audio.stop_ambient()
 
     def _save_runtime_ambient_preferences(self) -> None:
-        noise = self._current_ambient_value()
-        tone = self._current_solfeggio_value()
+        noise = self.settings_form.ambient_value
+        tone = self.settings_form.solfeggio_value
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
 
         updated = replace(
@@ -1302,8 +1127,8 @@ class CountdownApp:
         self.audio.set_ambient_volume(volume / 100.0)
         self.runtime_view.set_ambient_summary(
             format_ambient_summary(
-                self._current_ambient_value(),
-                self._current_solfeggio_value(),
+                self.settings_form.ambient_value,
+                self.settings_form.solfeggio_value,
                 volume,
             )
         )
@@ -1333,8 +1158,8 @@ class CountdownApp:
     def _refresh_runtime_ambient_summary(self) -> None:
         self.runtime_view.set_ambient_summary(
             format_ambient_summary(
-                self._current_ambient_value(),
-                self._current_solfeggio_value(),
+                self.settings_form.ambient_value,
+                self.settings_form.solfeggio_value,
                 round(self.ambient_volume_var.get()),
             )
         )
@@ -1352,15 +1177,19 @@ class CountdownApp:
         )
         if selected:
             if is_return:
-                self.return_custom_audio_path = selected
+                self.settings_form.return_custom_audio_path = selected
                 self.return_audio_var.set("自定义音频")
             else:
-                self.custom_audio_path = selected
+                self.settings_form.custom_audio_path = selected
                 self.audio_var.set("自定义音频")
 
     def _test_audio(self, is_return: bool) -> None:
         path = self._current_return_audio_path() if is_return else self._current_audio_path()
-        value = self._current_return_audio_value() if is_return else self._current_audio_value()
+        value = (
+            self.settings_form.return_audio_value
+            if is_return
+            else self.settings_form.audio_value
+        )
         if value == "custom" and not path.is_file():
             messagebox.showerror("音频错误", "请先选择有效的自定义音频文件。")
             return
@@ -1374,31 +1203,15 @@ class CountdownApp:
 
     def _start_focus(self) -> None:
         try:
-            settings = self._build_settings_from_form()
+            settings = self.settings_form.build_session_settings()
         except ValueError as error:
             self.form_error.config(text=str(error))
             return
         if not self._confirm_reminder_coverage(settings):
             return
         self.form_error.config(text="")
-        self.app_settings = AppSettings(
-            session=settings,
-            audio_choice=self._current_audio_value(),
-            custom_audio_path=self.custom_audio_path,
-            return_audio_choice=self._current_return_audio_value(),
-            return_custom_audio_path=self.return_custom_audio_path,
-            ambient_choice=self._current_ambient_value(),
-            solfeggio_choice=self._current_solfeggio_value(),
-            ambient_volume=round(self.ambient_volume_var.get()),
-            close_to_tray=self.close_to_tray_var.get(),
-            show_next_reminder=self.show_next_reminder_var.get(),
-            global_hotkeys_enabled=self.global_hotkeys_var.get(),
-            floating_status_enabled=self.floating_status_var.get(),
-            floating_x=self.app_settings.floating_x,
-            floating_y=self.app_settings.floating_y,
-            pause_hotkey=self.pause_hotkey_var.get().strip(),
-            window_hotkey=self.window_hotkey_var.get().strip(),
-            migration_completed=True,
+        self.app_settings = self.settings_form.build_app_settings(
+            self.app_settings, settings
         )
         try:
             self.store.save(self.app_settings)
@@ -1419,8 +1232,8 @@ class CountdownApp:
         self.settings_frame.pack_forget()
         self.break_prompt_frame.pack_forget()
         ambient_summary = format_ambient_summary(
-            self._current_ambient_value(),
-            self._current_solfeggio_value(),
+            self.settings_form.ambient_value,
+            self.settings_form.solfeggio_value,
             round(self.ambient_volume_var.get()),
         )
         self.runtime_view.show_focus(ambient_summary)
@@ -1570,7 +1383,9 @@ class CountdownApp:
         if self.session is None:
             return
         try:
-            duration = self._minutes(self.long_break_var.get(), "大休息")
+            duration = SettingsForm.parse_minutes(
+                self.long_break_var.get(), "大休息"
+            )
         except ValueError as error:
             messagebox.showerror("输入错误", str(error))
             return

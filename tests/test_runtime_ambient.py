@@ -59,6 +59,26 @@ class StoreStub:
         self.saved.append(settings)
 
 
+class SettingsFormStub:
+    def __init__(self, ambient, solfeggio):
+        self.ambient = ambient
+        self.solfeggio = solfeggio
+
+    @property
+    def ambient_value(self):
+        return {
+            "关闭": "off",
+            "粉红噪音": "pink",
+        }.get(self.ambient.get(), "off")
+
+    @property
+    def solfeggio_value(self):
+        return {
+            "关闭": "off",
+            "Solfeggio 528 Hz": "tone:528",
+        }.get(self.solfeggio.get(), "off")
+
+
 class RuntimeAmbientTests(unittest.TestCase):
     @staticmethod
     def make_app(state=SessionState.FOCUSING, play_result=True):
@@ -70,6 +90,9 @@ class RuntimeAmbientTests(unittest.TestCase):
         app.session = SimpleNamespace(state=state)
         app.ambient_var = ValueStub("粉红噪音")
         app.solfeggio_var = ValueStub("Solfeggio 528 Hz")
+        app.settings_form = SettingsFormStub(
+            app.ambient_var, app.solfeggio_var
+        )
         app.ambient_volume_var = ValueStub(35)
         app.ambient_volume_label_var = ValueStub("")
         app.runtime_summary = ValueStub("")

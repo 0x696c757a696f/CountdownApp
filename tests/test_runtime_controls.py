@@ -38,7 +38,7 @@ class RuntimeControlTests(unittest.TestCase):
         app = CountdownApp.__new__(CountdownApp)
         app.session = PausableSessionStub()
         app.audio = Mock()
-        app.pause_button = Mock()
+        app.runtime_view = Mock()
         app._close_reminder = Mock()
         app._update_focus_display = Mock()
 
@@ -46,6 +46,7 @@ class RuntimeControlTests(unittest.TestCase):
 
         app._close_reminder.assert_called_once_with(dismiss=False)
         app.audio.pause_ambient.assert_called_once_with()
+        app.runtime_view.set_pause_state.assert_called_once_with(paused=True)
 
 
 if __name__ == "__main__":

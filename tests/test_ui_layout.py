@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from tkinter import ttk
 
 from countdownapp.app import CountdownApp
+from countdownapp.runtime_view import RuntimeDisplay
 
 
 class SettingsActionLayoutTests(unittest.TestCase):
@@ -108,43 +109,61 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertGreaterEqual(window.winfo_height(), body.winfo_reqheight())
 
     def test_runtime_ambient_controls_are_compact_until_requested(self):
-        self.assertEqual("pack", self.app.runtime_ambient_bar.winfo_manager())
-        self.assertEqual("", self.app.runtime_ambient_controls.winfo_manager())
+        self.app.settings_frame.pack_forget()
+        self.app.runtime_view.show_focus("已关闭")
+        self.assertFalse(self.app.runtime_view.ambient_controls_expanded)
 
         self.app._toggle_runtime_ambient_controls()
         self.root.update_idletasks()
 
-        self.assertEqual("pack", self.app.runtime_ambient_controls.winfo_manager())
-        self.assertEqual("收起", self.app.runtime_ambient_toggle_button.cget("text"))
+        self.assertTrue(self.app.runtime_view.ambient_controls_expanded)
+        texts = {
+            widget.cget("text")
+            for widget in self._descendants(self.app.runtime_view.frame)
+            if isinstance(widget, (ttk.Label, ttk.Button))
+        }
+        self.assertIn("收起", texts)
         self.assertEqual((600, 460), (self.root.winfo_width(), self.root.winfo_height()))
 
     def test_timer_and_session_details_share_the_dashboard_row(self):
         self.app.settings_frame.pack_forget()
-        self.app.running_frame.pack(fill="both", expand=True)
+        self.app.runtime_view.show_focus("已关闭")
+        self.app.runtime_view.render(
+            RuntimeDisplay("56:42", "深度专注期", "当前基础随机区间：10–15 分钟")
+        )
         self.root.update_idletasks()
-
-        timer_y = self.app.timer_label.winfo_rooty()
-        phase_y = self.app.phase_label.winfo_rooty()
+        labels = {
+            widget.cget("text"): widget
+            for widget in self._descendants(self.app.runtime_view.frame)
+            if isinstance(widget, ttk.Label)
+        }
+        timer_y = labels["56:42"].winfo_rooty()
+        phase_y = labels["深度专注期"].winfo_rooty()
 
         self.assertLess(abs(timer_y - phase_y), 80)
 
     def test_runtime_actions_use_two_aligned_button_rows(self):
         self.app.settings_frame.pack_forget()
-        self.app.running_frame.pack(fill="both", expand=True)
+        self.app.runtime_view.show_focus("粉红噪音 · 20%")
         self.app._toggle_runtime_ambient_controls()
         self.root.update_idletasks()
+        buttons = {
+            widget.cget("text"): widget
+            for widget in self._descendants(self.app.runtime_view.frame)
+            if isinstance(widget, ttk.Button)
+        }
 
         self.assertLessEqual(
             abs(
-                self.app.runtime_ambient_stop_button.winfo_rooty()
-                - self.app.runtime_ambient_toggle_button.winfo_rooty()
+                buttons["关闭"].winfo_rooty()
+                - buttons["收起"].winfo_rooty()
             ),
             2,
         )
         bottom_buttons = (
-            self.app.pause_button,
-            self.app.stop_focus_button,
-            self.app.hide_to_tray_button,
+            buttons["暂停专注"],
+            buttons["结束专注"],
+            buttons["隐藏到托盘"],
         )
         self.assertEqual(1, len({button.winfo_rooty() for button in bottom_buttons}))
         self.assertLessEqual(
@@ -153,16 +172,12 @@ class SettingsActionLayoutTests(unittest.TestCase):
             1,
         )
         self.assertGreaterEqual(
-            self.app.runtime_ambient_summary_label.winfo_width(),
-            min(self.app.runtime_ambient_summary_label.winfo_reqwidth(), 260),
-        )
-        self.assertGreaterEqual(
-            self.root.winfo_height(), self.app.running_frame.winfo_reqheight()
+            self.root.winfo_height(), self.app.runtime_view.required_height
         )
         button_bottom = (
-            self.app.hide_to_tray_button.winfo_rooty()
+            buttons["隐藏到托盘"].winfo_rooty()
             - self.root.winfo_rooty()
-            + self.app.hide_to_tray_button.winfo_height()
+            + buttons["隐藏到托盘"].winfo_height()
         )
         self.assertGreaterEqual(self.root.winfo_height() - button_bottom, 12)
         self.assertEqual(460, self.root.minsize()[1])

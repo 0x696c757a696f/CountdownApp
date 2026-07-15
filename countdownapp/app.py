@@ -33,7 +33,6 @@ from .floating import FloatingStatusController, TkFloatingStatusView
 from .hotkeys import GlobalHotkeyService
 from .logging_config import configure_logging
 from .presentation import (
-    RenderCache,
     format_ambient_summary,
     format_feedback_summary,
     format_reminder_status,
@@ -49,6 +48,7 @@ from .reminder_view import (
     ReminderResultKind,
     ReminderView,
 )
+from .runtime_view import RuntimeBindings, RuntimeDisplay, RuntimeView
 from .session import FocusSession, RuntimeEventKind
 from .single_instance import SingleInstanceGuard, show_native_message
 from .startup import StartupManager, StartupMode, should_start_hidden
@@ -154,8 +154,6 @@ class CountdownApp:
         self.tray_after_id: str | None = None
         self.audio_after_id: str | None = None
         self.reminder_view = ReminderView(self.root)
-        self.render_cache = RenderCache()
-
         self.tray_commands: "queue.Queue[str]" = queue.Queue()
         self.tray = TrayService(resource_path("clock_icon.ico"), self.tray_commands, self.logger)
         self.hotkeys = GlobalHotkeyService(self.tray_commands, self.logger)
@@ -309,7 +307,6 @@ class CountdownApp:
 
     def _build_ui(self) -> None:
         self.settings_frame = ttk.Frame(self.root, padding=(26, 20), style="App.TFrame")
-        self.running_frame = ttk.Frame(self.root, padding=(24, 16), style="App.TFrame")
         self.break_prompt_frame = ttk.Frame(self.root, padding=30, style="App.TFrame")
         self.settings_frame.pack(fill="both", expand=True)
 
@@ -690,159 +687,24 @@ class CountdownApp:
         ).pack(side="left", padx=6)
         ttk.Button(actions, text="退出程序", command=self._shutdown).pack(side="left", padx=6)
 
-        dashboard = ttk.Frame(
-            self.running_frame, padding=(16, 10), style="Form.TFrame"
+        self.runtime_view = RuntimeView(
+            self.root,
+            RuntimeBindings(
+                noise_var=self.ambient_var,
+                tone_var=self.solfeggio_var,
+                volume_var=self.ambient_volume_var,
+                volume_label_var=self.ambient_volume_label_var,
+                on_ambient_change=self._apply_runtime_ambient,
+                on_volume_change=self._on_runtime_ambient_volume_changed,
+                on_volume_commit=self._save_runtime_ambient_preferences,
+                on_stop_ambient=self._stop_runtime_ambient,
+                on_pause=self._toggle_pause,
+                on_stop_focus=self._stop_focus,
+                on_hide=self._minimize_to_tray,
+            ),
+            noise_options=tuple(NOISE_OPTIONS),
+            tone_options=tuple(SOLFEGGIO_OPTIONS),
         )
-        dashboard.pack(fill="x", padx=30)
-        dashboard.columnconfigure(2, weight=1)
-        timer_block = ttk.Frame(dashboard, style="Form.TFrame")
-        timer_block.grid(row=0, column=0, sticky="nsew")
-        ttk.Label(
-            timer_block, text="剩余时间", style="FormHint.TLabel"
-        ).pack(anchor="w")
-        self.timer_label = ttk.Label(
-            timer_block, text="00:00", style="DashboardTimer.TLabel"
-        )
-        self.timer_label.pack(anchor="w")
-        ttk.Separator(dashboard, orient="vertical").grid(
-            row=0, column=1, sticky="ns", padx=16
-        )
-        details = ttk.Frame(dashboard, style="Form.TFrame")
-        details.grid(row=0, column=2, sticky="nsew")
-        self.phase_label = ttk.Label(details, text="", style="Form.TLabel")
-        self.phase_label.pack(anchor="w", pady=(2, 3))
-        self.interval_label = ttk.Label(
-            details,
-            text="",
-            style="FormHint.TLabel",
-            wraplength=300,
-            justify="left",
-        )
-        self.interval_label.pack(anchor="w", pady=2)
-        self.feedback_label = ttk.Label(
-            details,
-            text="",
-            style="FormHint.TLabel",
-            wraplength=300,
-            justify="left",
-        )
-        self.feedback_label.pack(anchor="w", pady=2)
-
-        self.runtime_ambient_summary_var = tk.StringVar(value="已关闭")
-        self.runtime_ambient_controls_visible = False
-        self.runtime_ambient_card = ttk.Frame(
-            self.running_frame, padding=(16, 10), style="Form.TFrame"
-        )
-        self.runtime_ambient_card.pack(fill="x", padx=30, pady=(8, 0))
-        self.runtime_ambient_bar = ttk.Frame(
-            self.runtime_ambient_card, style="Form.TFrame"
-        )
-        self.runtime_ambient_bar.pack(fill="x")
-        self.runtime_ambient_bar.columnconfigure(1, weight=1)
-        ttk.Label(
-            self.runtime_ambient_bar, text="持续背景音", style="Form.TLabel"
-        ).grid(row=0, column=0, columnspan=2, sticky="w")
-        self.runtime_ambient_summary_label = ttk.Label(
-            self.runtime_ambient_bar,
-            textvariable=self.runtime_ambient_summary_var,
-            style="FormHint.TLabel",
-            wraplength=300,
-            justify="left",
-        )
-        self.runtime_ambient_summary_label.grid(
-            row=1, column=0, columnspan=2, sticky="ew", pady=(2, 0)
-        )
-        ambient_header_actions = ttk.Frame(
-            self.runtime_ambient_bar, style="Form.TFrame"
-        )
-        ambient_header_actions.grid(row=0, column=2, rowspan=2, sticky="e")
-        self.runtime_ambient_stop_button = ttk.Button(
-            ambient_header_actions,
-            text="关闭",
-            width=7,
-            command=self._stop_runtime_ambient,
-        )
-        self.runtime_ambient_stop_button.grid(row=0, column=0, padx=(0, 6))
-        self.runtime_ambient_stop_button.grid_remove()
-        self.runtime_ambient_toggle_button = ttk.Button(
-            ambient_header_actions,
-            text="调整",
-            width=7,
-            command=self._toggle_runtime_ambient_controls,
-        )
-        self.runtime_ambient_toggle_button.grid(row=0, column=1)
-
-        self.runtime_ambient_controls = ttk.Frame(
-            self.runtime_ambient_card, padding=(0, 10, 0, 0), style="Form.TFrame"
-        )
-        self.runtime_ambient_controls.columnconfigure(1, weight=1)
-        ttk.Label(
-            self.runtime_ambient_controls, text="噪音底色", style="Form.TLabel"
-        ).grid(row=0, column=0, sticky="e", pady=4)
-        runtime_noise = ttk.Combobox(
-            self.runtime_ambient_controls,
-            textvariable=self.ambient_var,
-            values=tuple(NOISE_OPTIONS),
-            state="readonly",
-        )
-        runtime_noise.grid(row=0, column=1, sticky="ew", padx=(12, 0), pady=4)
-        runtime_noise.bind(
-            "<<ComboboxSelected>>", lambda _event: self._apply_runtime_ambient()
-        )
-        ttk.Label(
-            self.runtime_ambient_controls, text="Solfeggio", style="Form.TLabel"
-        ).grid(row=1, column=0, sticky="e", pady=4)
-        runtime_tone = ttk.Combobox(
-            self.runtime_ambient_controls,
-            textvariable=self.solfeggio_var,
-            values=tuple(SOLFEGGIO_OPTIONS),
-            state="readonly",
-        )
-        runtime_tone.grid(row=1, column=1, sticky="ew", padx=(12, 0), pady=4)
-        runtime_tone.bind(
-            "<<ComboboxSelected>>", lambda _event: self._apply_runtime_ambient()
-        )
-        ttk.Label(
-            self.runtime_ambient_controls, text="音量", style="Form.TLabel"
-        ).grid(row=2, column=0, sticky="e", pady=4)
-        runtime_volume = ttk.Scale(
-            self.runtime_ambient_controls,
-            from_=0,
-            to=100,
-            variable=self.ambient_volume_var,
-            command=self._on_runtime_ambient_volume_changed,
-        )
-        runtime_volume.grid(row=2, column=1, sticky="ew", padx=(12, 8), pady=4)
-        runtime_volume.bind(
-            "<ButtonRelease-1>", lambda _event: self._save_runtime_ambient_preferences()
-        )
-        runtime_volume.bind(
-            "<KeyRelease>", lambda _event: self._save_runtime_ambient_preferences()
-        )
-        ttk.Label(
-            self.runtime_ambient_controls,
-            textvariable=self.ambient_volume_label_var,
-            style="FormHint.TLabel",
-            width=5,
-        ).grid(row=2, column=2, sticky="w")
-        self.running_actions = ttk.Frame(self.running_frame)
-        self.running_actions.pack(fill="x", padx=30, pady=12)
-        for column in range(3):
-            self.running_actions.columnconfigure(
-                column, weight=1, uniform="runtime_actions"
-            )
-        self.pause_button = ttk.Button(
-            self.running_actions, text="暂停专注", command=self._toggle_pause
-        )
-        self.pause_button.grid(row=0, column=0, sticky="ew", padx=4)
-        self.stop_focus_button = ttk.Button(
-            self.running_actions, text="结束专注", command=self._stop_focus
-        )
-        self.stop_focus_button.grid(row=0, column=1, sticky="ew", padx=4)
-        self.hide_to_tray_button = ttk.Button(
-            self.running_actions, text="隐藏到托盘", command=self._minimize_to_tray
-        )
-        self.hide_to_tray_button.grid(row=0, column=2, sticky="ew", padx=4)
 
         ttk.Label(self.break_prompt_frame, text="专注完成", style="Title.TLabel").pack(pady=30)
         ttk.Label(
@@ -1384,7 +1246,7 @@ class CountdownApp:
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
         self._save_runtime_ambient_preferences()
         if noise != "off" or tone != "off":
-            self.runtime_ambient_summary_var.set("正在准备背景音…")
+            self.runtime_view.set_ambient_summary("正在准备背景音…")
         self._play_ambient_selection(
             noise,
             tone,
@@ -1400,11 +1262,11 @@ class CountdownApp:
         if played and self.session is not None and self.session.state is SessionState.PAUSED:
             self.audio.pause_ambient()
         if not played:
-            self.runtime_ambient_summary_var.set(
+            self.runtime_view.set_ambient_summary(
                 "播放失败 · 已保留选择，等待下次重试"
             )
         else:
-            self.runtime_ambient_summary_var.set(
+            self.runtime_view.set_ambient_summary(
                 format_ambient_summary(noise, tone, volume)
             )
 
@@ -1429,7 +1291,7 @@ class CountdownApp:
         except (OSError, ValueError) as error:
             self.logger.warning("Saving runtime ambient setting failed: %s", error)
         self.ambient_volume_label_var.set(f"{volume}%")
-        self.runtime_ambient_summary_var.set(
+        self.runtime_view.set_ambient_summary(
             format_ambient_summary(noise, tone, volume)
         )
 
@@ -1438,7 +1300,7 @@ class CountdownApp:
         self.ambient_volume_label_var.set(f"{volume}%")
         self.ambient_tasks.set_volume(volume / 100.0)
         self.audio.set_ambient_volume(volume / 100.0)
-        self.runtime_ambient_summary_var.set(
+        self.runtime_view.set_ambient_summary(
             format_ambient_summary(
                 self._current_ambient_value(),
                 self._current_solfeggio_value(),
@@ -1452,25 +1314,10 @@ class CountdownApp:
         self._apply_runtime_ambient()
 
     def _toggle_runtime_ambient_controls(self) -> None:
-        self.runtime_ambient_controls_visible = not self.runtime_ambient_controls_visible
-        if self.runtime_ambient_controls_visible:
-            self.runtime_ambient_controls.pack(fill="x")
-            self.runtime_ambient_stop_button.grid()
-            self.runtime_ambient_toggle_button.config(text="收起")
-        else:
-            self.runtime_ambient_controls.pack_forget()
-            self.runtime_ambient_stop_button.grid_remove()
-            self.runtime_ambient_toggle_button.config(text="调整")
-        self._apply_runtime_window_layout()
+        self.runtime_view.toggle_ambient_controls()
 
     def _apply_runtime_window_layout(self) -> None:
-        window_layout = runtime_window_layout(
-            self.root.winfo_screenwidth(),
-            self.root.winfo_screenheight(),
-            controls_expanded=self.runtime_ambient_controls_visible,
-        )
-        self.root.minsize(window_layout.min_width, window_layout.min_height)
-        self.root.geometry(window_layout.geometry)
+        self.runtime_view.apply_window_layout()
 
     def _apply_break_prompt_window_layout(self) -> None:
         self.root.update_idletasks()
@@ -1484,7 +1331,7 @@ class CountdownApp:
         self.root.geometry(window_layout.geometry)
 
     def _refresh_runtime_ambient_summary(self) -> None:
-        self.runtime_ambient_summary_var.set(
+        self.runtime_view.set_ambient_summary(
             format_ambient_summary(
                 self._current_ambient_value(),
                 self._current_solfeggio_value(),
@@ -1571,20 +1418,13 @@ class CountdownApp:
         )
         self.settings_frame.pack_forget()
         self.break_prompt_frame.pack_forget()
-        if not self.runtime_ambient_card.winfo_manager():
-            self.runtime_ambient_card.pack(
-                fill="x", padx=30, pady=(8, 0), before=self.running_actions
-            )
-        if self.runtime_ambient_controls_visible:
-            self.runtime_ambient_controls.pack_forget()
-            self.runtime_ambient_controls_visible = False
-            self.runtime_ambient_stop_button.grid_remove()
-            self.runtime_ambient_toggle_button.config(text="调整")
-        self._refresh_runtime_ambient_summary()
-        self._apply_runtime_window_layout()
-        self.running_frame.pack(fill="both", expand=True)
-        self.pause_button.config(text="暂停专注")
-        self.render_cache.invalidate()
+        ambient_summary = format_ambient_summary(
+            self._current_ambient_value(),
+            self._current_solfeggio_value(),
+            round(self.ambient_volume_var.get()),
+        )
+        self.runtime_view.show_focus(ambient_summary)
+        self.runtime_view.invalidate()
         self._update_focus_display()
         self.logger.info(
             "Focus started: duration=%s mode=%s preset=%s",
@@ -1622,7 +1462,7 @@ class CountdownApp:
             elif event.kind is RuntimeEventKind.SUSPEND_DETECTED:
                 self._close_reminder(dismiss=False)
                 self.audio.pause_ambient()
-                self.pause_button.config(text="继续专注")
+                self.runtime_view.set_pause_state(paused=True)
                 messagebox.showinfo(
                     "专注已暂停",
                     "检测到电脑睡眠或长时间挂起。过期提醒已取消，请确认后继续。",
@@ -1646,15 +1486,9 @@ class CountdownApp:
         if self.session is None:
             return
         timer_text = self._format_seconds(self.session.remaining_sec)
-        self.render_cache.update(
-            "timer", timer_text, lambda value: self.timer_label.config(text=value)
-        )
         phase = self.session.current_phase
         state_suffix = "（已暂停）" if self.session.state is SessionState.PAUSED else ""
         phase_text = f"{PHASE_NAMES[phase]}{state_suffix}"
-        self.render_cache.update(
-            "phase", phase_text, lambda value: self.phase_label.config(text=value)
-        )
         interval = self._phase_interval(phase)
         interval_text = format_reminder_status(
             interval.minimum_sec,
@@ -1663,18 +1497,12 @@ class CountdownApp:
             self.session.next_reminder_remaining_sec,
             adaptive_enabled=self.session.settings.adaptive_reminders_enabled,
         )
-        self.render_cache.update(
-            "interval", interval_text,
-            lambda value: self.interval_label.config(text=value),
-        )
         feedback_text = format_feedback_summary(
             self.session.feedback_summary,
             self.session.settings.adaptive_reminders_enabled,
         )
-        self.render_cache.update(
-            "feedback",
-            feedback_text,
-            lambda value: self.feedback_label.config(text=value),
+        self.runtime_view.render(
+            RuntimeDisplay(timer_text, phase_text, interval_text, feedback_text)
         )
         self.floating_status.update(timer_text, phase_text)
 
@@ -1700,10 +1528,10 @@ class CountdownApp:
         if self.session.is_long_break:
             if self.session.state is SessionState.LONG_BREAK:
                 self.session.pause()
-                self.pause_button.config(text="继续休息")
+                self.runtime_view.set_pause_state(paused=True, long_break=True)
             elif self.session.state is SessionState.PAUSED:
                 self.session.resume()
-                self.pause_button.config(text="暂停休息")
+                self.runtime_view.set_pause_state(paused=False, long_break=True)
             self._update_long_break_display()
             return
         if self.session.state is SessionState.FOCUSING:
@@ -1712,11 +1540,11 @@ class CountdownApp:
             if reminder_was_visible:
                 self._close_reminder(dismiss=False)
             self.audio.pause_ambient()
-            self.pause_button.config(text="继续专注")
+            self.runtime_view.set_pause_state(paused=True)
         elif self.session.state is SessionState.PAUSED:
             self.session.resume()
             self.audio.resume_ambient()
-            self.pause_button.config(text="暂停专注")
+            self.runtime_view.set_pause_state(paused=False)
         self._update_focus_display()
 
     def _stop_focus(self) -> None:
@@ -1733,11 +1561,7 @@ class CountdownApp:
         self.audio.stop_bell()
         self._stop_ambient_playback()
         self.floating_status.end_session()
-        self.running_frame.pack_forget()
-        self.runtime_ambient_controls.pack_forget()
-        self.runtime_ambient_controls_visible = False
-        self.runtime_ambient_stop_button.grid_remove()
-        self.runtime_ambient_toggle_button.config(text="调整")
+        self.runtime_view.hide()
         self.break_prompt_frame.pack(fill="both", expand=True)
         self._apply_break_prompt_window_layout()
         self.logger.info("Focus completed; waiting for long-break confirmation")
@@ -1752,11 +1576,8 @@ class CountdownApp:
             return
         self.session.start_long_break(duration)
         self.break_prompt_frame.pack_forget()
-        self.runtime_ambient_card.pack_forget()
-        self._apply_runtime_window_layout()
-        self.running_frame.pack(fill="both", expand=True)
-        self.pause_button.config(text="暂停休息")
-        self.render_cache.invalidate()
+        self.runtime_view.show_long_break()
+        self.runtime_view.invalidate()
         self._update_long_break_display()
         self._schedule_tick(self.session_generation)
 
@@ -1766,18 +1587,12 @@ class CountdownApp:
         remaining = self.session.long_break_remaining_sec
         timer_text = self._format_seconds(remaining)
         phase_text = "大休息（已暂停）" if self.session.state is SessionState.PAUSED else "大休息"
-        self.render_cache.update(
-            "timer", timer_text, lambda value: self.timer_label.config(text=value)
-        )
-        self.render_cache.update(
-            "phase", phase_text, lambda value: self.phase_label.config(text=value)
-        )
-        self.render_cache.update(
-            "interval", "休息期间不会产生随机提醒",
-            lambda value: self.interval_label.config(text=value),
-        )
-        self.render_cache.update(
-            "feedback", "", lambda value: self.feedback_label.config(text=value)
+        self.runtime_view.render(
+            RuntimeDisplay(
+                timer_text,
+                phase_text,
+                "休息期间不会产生随机提醒",
+            )
         )
 
     def _skip_long_break(self) -> None:
@@ -1794,10 +1609,10 @@ class CountdownApp:
         self.audio.stop_bell()
         self._stop_ambient_playback()
         self.floating_status.end_session()
-        self.running_frame.pack_forget()
+        self.runtime_view.hide()
         self.break_prompt_frame.pack_forget()
         self.settings_frame.pack(fill="both", expand=True)
-        self.render_cache.invalidate()
+        self.runtime_view.invalidate()
         self._apply_settings_window_layout()
         self.root.deiconify()
 

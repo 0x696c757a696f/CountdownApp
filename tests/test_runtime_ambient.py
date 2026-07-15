@@ -72,7 +72,10 @@ class RuntimeAmbientTests(unittest.TestCase):
         app.solfeggio_var = ValueStub("Solfeggio 528 Hz")
         app.ambient_volume_var = ValueStub(35)
         app.ambient_volume_label_var = ValueStub("")
-        app.runtime_ambient_summary_var = ValueStub("")
+        app.runtime_summary = ValueStub("")
+        app.runtime_view = SimpleNamespace(
+            set_ambient_summary=app.runtime_summary.set
+        )
         return app
 
     def test_runtime_selection_applies_immediately_and_becomes_the_default(self):
@@ -91,7 +94,7 @@ class RuntimeAmbientTests(unittest.TestCase):
         self.assertEqual([app.app_settings], app.store.saved)
         self.assertEqual(
             "粉红噪音 + Solfeggio 528 Hz · 35%",
-            app.runtime_ambient_summary_var.get(),
+            app.runtime_summary.get(),
         )
 
     def test_changing_the_mix_while_paused_does_not_resume_audio(self):
@@ -121,7 +124,7 @@ class RuntimeAmbientTests(unittest.TestCase):
             app._apply_runtime_ambient()
 
         warning.assert_called_once()
-        self.assertIn("播放失败", app.runtime_ambient_summary_var.get())
+        self.assertIn("播放失败", app.runtime_summary.get())
 
 
 if __name__ == "__main__":

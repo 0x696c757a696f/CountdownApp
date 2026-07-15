@@ -56,6 +56,12 @@ class FocusSession:
         return self._scheduler.phase_at(self.active_elapsed_sec)
 
     @property
+    def next_reminder_remaining_sec(self) -> float | None:
+        if self._scheduled is None or self._scheduled.kind is not EventKind.REMINDER_DUE:
+            return None
+        return max(0.0, self._scheduled.due_active_sec - self.active_elapsed_sec)
+
+    @property
     def long_break_remaining_sec(self) -> float:
         return max(0.0, self._long_break_remaining_sec or 0.0)
 

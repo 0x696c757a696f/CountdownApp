@@ -37,6 +37,7 @@ class ConfigStoreTests(unittest.TestCase):
                 solfeggio_choice="tone:639",
                 ambient_volume=23,
                 close_to_tray=False,
+                show_next_reminder=True,
             )
 
             store.save(expected)
@@ -101,6 +102,42 @@ class ConfigStoreTests(unittest.TestCase):
             self.assertEqual("custom", migrated.audio_choice)
             self.assertEqual("D:/sounds/legacy.wav", migrated.custom_audio_path)
             self.assertEqual(migrated, loaded_again)
+
+    def test_missing_nested_fields_are_filled_without_discarding_user_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            store = ConfigStore(path)
+            store.save(AppSettings(audio_choice="2.wav", ambient_volume=37))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            del data["session"]["reminder_preset"]
+            del data["session"]["v2"]["fatigue_interval"]
+            path.write_text(json.dumps(data), encoding="utf-8")
+
+            loaded = store.load()
+
+            self.assertEqual("2.wav", loaded.audio_choice)
+            self.assertEqual(37, loaded.ambient_volume)
+            self.assertEqual(ReminderPreset.BALANCED, loaded.session.reminder_preset)
+            self.assertEqual(
+                SessionSettings.defaults().v2.fatigue_interval,
+                loaded.session.v2.fatigue_interval,
+            )
+
+    def test_invalid_config_is_preserved_before_defaults_are_returned(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "settings.json"
+            path.write_text("{ definitely not json", encoding="utf-8")
+
+            store = ConfigStore(path)
+            loaded = store.load()
+
+            self.assertEqual(AppSettings(), loaded)
+            self.assertFalse(path.exists())
+            backups = list(root.glob("settings.invalid*.json"))
+            self.assertEqual(1, len(backups))
+            self.assertEqual(backups[0], store.last_recovery_path)
+            self.assertEqual("{ definitely not json", backups[0].read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ class AppSettings:
     solfeggio_choice: str = "off"
     ambient_volume: int = 20
     close_to_tray: bool = True
+    show_next_reminder: bool = False
     migration_completed: bool = False
     schema_version: int = SCHEMA_VERSION
 
@@ -42,14 +43,18 @@ def default_config_path() -> Path:
 class ConfigStore:
     def __init__(self, path: Path | None = None):
         self.path = path or default_config_path()
+        self.last_recovery_path: Path | None = None
 
     def load(self) -> AppSettings:
         if not self.path.exists():
             return AppSettings()
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
-            return self._decode(data)
+            self._normalize_legacy_shape(data)
+            merged = self._merge_missing(self._encode(AppSettings()), data)
+            return self._decode(merged)
         except (OSError, ValueError, KeyError, TypeError):
+            self.last_recovery_path = self._preserve_invalid_config()
             return AppSettings()
 
     def save(self, settings: AppSettings) -> None:
@@ -109,6 +114,7 @@ class ConfigStore:
             },
             "behavior": {
                 "close_to_tray": settings.close_to_tray,
+                "show_next_reminder": settings.show_next_reminder,
             },
             "ambient": {
                 "choice": settings.ambient_choice,
@@ -190,6 +196,47 @@ class ConfigStore:
             solfeggio_choice=solfeggio_choice,
             ambient_volume=max(0, min(100, int(ambient.get("volume", 20)))),
             close_to_tray=bool(behavior.get("close_to_tray", True)),
+            show_next_reminder=bool(behavior.get("show_next_reminder", False)),
             migration_completed=bool(data.get("migration_completed", False)),
             schema_version=SCHEMA_VERSION,
         )
+
+    @staticmethod
+    def _merge_missing(defaults: dict, user_data: dict) -> dict:
+        if not isinstance(user_data, dict):
+            raise TypeError("Settings root must be an object")
+        merged = dict(defaults)
+        for key, value in user_data.items():
+            if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = ConfigStore._merge_missing(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+
+    @staticmethod
+    def _normalize_legacy_shape(data: dict) -> None:
+        if not isinstance(data, dict):
+            return
+        ambient = data.get("ambient")
+        if not isinstance(ambient, dict) or "solfeggio_choice" in ambient:
+            return
+        choice = ambient.get("choice")
+        if isinstance(choice, str) and choice.startswith("tone:"):
+            ambient["solfeggio_choice"] = choice
+            ambient["choice"] = "off"
+
+    def _preserve_invalid_config(self) -> Path | None:
+        if not self.path.exists():
+            return None
+        candidate = self.path.with_name(f"{self.path.stem}.invalid{self.path.suffix}")
+        sequence = 1
+        while candidate.exists():
+            candidate = self.path.with_name(
+                f"{self.path.stem}.invalid.{sequence}{self.path.suffix}"
+            )
+            sequence += 1
+        try:
+            os.replace(self.path, candidate)
+            return candidate
+        except OSError:
+            return None

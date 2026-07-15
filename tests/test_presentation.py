@@ -1,6 +1,6 @@
 import unittest
 
-from countdownapp.presentation import RenderCache
+from countdownapp.presentation import RenderCache, format_reminder_status
 
 
 class RenderCacheTests(unittest.TestCase):
@@ -23,6 +23,23 @@ class RenderCacheTests(unittest.TestCase):
 
         self.assertTrue(cache.update("phase", "深度专注期", rendered.append))
         self.assertEqual(["深度专注期", "深度专注期"], rendered)
+
+
+class ReminderStatusTests(unittest.TestCase):
+    def test_exact_reminder_time_is_masked_by_default(self):
+        text = format_reminder_status(180, 300, False, 245)
+
+        self.assertEqual("当前随机区间：3–5 分钟", text)
+
+    def test_user_can_reveal_the_next_reminder_countdown(self):
+        text = format_reminder_status(180, 300, True, 245)
+
+        self.assertEqual("当前随机区间：3–5 分钟 ｜ 下次提醒约 04:05 后", text)
+
+    def test_phase_boundary_is_not_misrepresented_as_a_reminder(self):
+        text = format_reminder_status(240, 420, True, None)
+
+        self.assertEqual("当前随机区间：4–7 分钟 ｜ 阶段切换后重新抽取", text)
 
 
 if __name__ == "__main__":

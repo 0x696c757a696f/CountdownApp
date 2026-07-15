@@ -23,7 +23,7 @@ from .domain import (
     validate_settings,
 )
 from .logging_config import configure_logging
-from .presentation import RenderCache
+from .presentation import RenderCache, format_reminder_status
 from .resources import install_dir, resource_path
 from .session import FocusSession, RuntimeEventKind
 from .startup import StartupManager, StartupMode, should_start_hidden
@@ -109,8 +109,23 @@ class CountdownApp:
         self._build_ui()
         self._load_form(self.app_settings)
         tray_ready = self.tray.start()
-        if should_start_hidden(sys.argv, tray_ready=tray_ready):
+        start_hidden = should_start_hidden(sys.argv, tray_ready=tray_ready)
+        if start_hidden:
             self.root.withdraw()
+        if self.store.last_recovery_path is not None:
+            self.logger.warning(
+                "Invalid settings preserved as %s",
+                self.store.last_recovery_path.name,
+            )
+            if not start_hidden:
+                backup_name = self.store.last_recovery_path.name
+                self.root.after(
+                    0,
+                    lambda: messagebox.showwarning(
+                        "配置已恢复",
+                        f"原配置无法读取，已保留为 {backup_name}，本次使用默认设置。",
+                    ),
+                )
         self.tray_after_id = self.root.after(self.TRAY_POLL_MS, self._poll_tray)
         self.logger.info("Application started")
 
@@ -220,6 +235,7 @@ class CountdownApp:
         self.ambient_volume_var = tk.DoubleVar()
         self.ambient_volume_label_var = tk.StringVar()
         self.close_to_tray_var = tk.BooleanVar()
+        self.show_next_reminder_var = tk.BooleanVar()
         self.startup_var = tk.StringVar()
         self.custom_audio_path = ""
         self.return_custom_audio_path = ""
@@ -439,16 +455,22 @@ class CountdownApp:
         )
         ttk.Checkbutton(
             self.more_frame,
+            text="显示下一次提醒的剩余时间（默认遮蔽，减少等待焦虑）",
+            variable=self.show_next_reminder_var,
+            style="Form.TCheckbutton",
+        ).grid(row=7, column=0, columnspan=4, sticky="w", pady=4)
+        ttk.Checkbutton(
+            self.more_frame,
             text="关闭主窗口时隐藏到托盘（任务栏不显示）",
             variable=self.close_to_tray_var,
             command=self._on_close_to_tray_changed,
             style="Form.TCheckbutton",
-        ).grid(row=7, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=8, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Label(
             self.more_frame,
             text="开机启动",
             style="Form.TLabel",
-        ).grid(row=8, column=0, sticky="e", pady=4)
+        ).grid(row=9, column=0, sticky="e", pady=4)
         startup_box = ttk.Combobox(
             self.more_frame,
             textvariable=self.startup_var,
@@ -456,7 +478,7 @@ class CountdownApp:
             state="readonly",
             width=30,
         )
-        startup_box.grid(row=8, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        startup_box.grid(row=9, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         startup_box.bind("<<ComboboxSelected>>", lambda _event: self._on_startup_changed())
 
         self.form_error = ttk.Label(
@@ -594,6 +616,7 @@ class CountdownApp:
         self.ambient_volume_var.set(settings.ambient_volume)
         self.ambient_volume_label_var.set(f"{settings.ambient_volume}%")
         self.close_to_tray_var.set(settings.close_to_tray)
+        self.show_next_reminder_var.set(settings.show_next_reminder)
         self.startup_var.set(
             next(
                 label
@@ -912,6 +935,7 @@ class CountdownApp:
             solfeggio_choice=self._current_solfeggio_value(),
             ambient_volume=round(self.ambient_volume_var.get()),
             close_to_tray=self.close_to_tray_var.get(),
+            show_next_reminder=self.show_next_reminder_var.get(),
             migration_completed=True,
         )
         try:
@@ -993,9 +1017,11 @@ class CountdownApp:
             "phase", phase_text, lambda value: self.phase_label.config(text=value)
         )
         interval = self._phase_interval(phase)
-        interval_text = (
-            f"当前随机区间：{self._number(interval.minimum_sec / 60)}–"
-            f"{self._number(interval.maximum_sec / 60)} 分钟"
+        interval_text = format_reminder_status(
+            interval.minimum_sec,
+            interval.maximum_sec,
+            self.app_settings.show_next_reminder,
+            self.session.next_reminder_remaining_sec,
         )
         self.render_cache.update(
             "interval", interval_text,

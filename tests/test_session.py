@@ -19,6 +19,42 @@ class FakeClock:
 
 
 class FocusSessionTests(unittest.TestCase):
+    def test_exposes_next_reminder_as_remaining_active_time(self):
+        clock = FakeClock()
+        defaults = SessionSettings.defaults(
+            focus_duration_sec=20 * 60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        settings = replace(defaults, classic_interval=IntervalRange(60, 60))
+        session = FocusSession(settings, FixedRandom([60]), clock.now)
+
+        session.start()
+        self.assertEqual(60, session.next_reminder_remaining_sec)
+        clock.advance(10)
+        session.tick()
+
+        self.assertEqual(50, session.next_reminder_remaining_sec)
+
+    def test_does_not_claim_a_reminder_time_when_phase_change_comes_first(self):
+        clock = FakeClock()
+        defaults = SessionSettings.defaults(
+            focus_duration_sec=90 * 60,
+            algorithm_mode=AlgorithmMode.V2,
+        )
+        settings = replace(
+            defaults,
+            v2=replace(
+                defaults.v2,
+                anchor_end_sec=20 * 60,
+                anchor_interval=IntervalRange(30 * 60, 30 * 60),
+            ),
+        )
+        session = FocusSession(settings, FixedRandom([30 * 60]), clock.now)
+
+        session.start()
+
+        self.assertIsNone(session.next_reminder_remaining_sec)
+
     def test_manual_pause_preserves_the_pending_reminder(self):
         clock = FakeClock()
         settings = SessionSettings.defaults(

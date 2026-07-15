@@ -100,9 +100,6 @@ class CountdownApp:
         self.reminder_after_id: str | None = None
         self.audio_after_id: str | None = None
         self.reminder_window: tk.Toplevel | None = None
-        self.long_break_deadline: float | None = None
-        self.long_break_paused_remaining: float | None = None
-        self.in_long_break = False
         self.render_cache = RenderCache()
 
         self.tray_commands: "queue.Queue[str]" = queue.Queue()
@@ -931,7 +928,6 @@ class CountdownApp:
             self.app_settings.solfeggio_choice,
             self.app_settings.ambient_volume / 100.0,
         )
-        self.in_long_break = False
         self.settings_frame.pack_forget()
         self.break_prompt_frame.pack_forget()
         self.running_frame.pack(fill="both", expand=True)
@@ -957,23 +953,28 @@ class CountdownApp:
         self.tick_after_id = None
         if generation != self.session_generation or self.session is None:
             return
-        if self.in_long_break:
-            self._tick_long_break()
+        for event in self.session.tick():
+            if event.kind is RuntimeEventKind.REMINDER_DUE:
+                self._show_reminder(event.phase)
+            elif event.kind is RuntimeEventKind.SUSPEND_DETECTED:
+                self._close_reminder(dismiss=False)
+                self.audio.pause_ambient()
+                self.pause_button.config(text="继续")
+                messagebox.showinfo(
+                    "专注已暂停",
+                    "检测到电脑睡眠或长时间挂起。过期提醒已取消，请确认后继续。",
+                )
+            elif event.kind is RuntimeEventKind.SESSION_FINISHED:
+                self._show_break_prompt()
+                return
+            elif event.kind is RuntimeEventKind.LONG_BREAK_FINISHED:
+                self.audio.play_bell(self._current_return_audio_path())
+                messagebox.showinfo("休息结束", "大休息结束，可以开始下一个周期。")
+                self._return_to_settings()
+                return
+        if self.session.is_long_break:
+            self._update_long_break_display()
         else:
-            for event in self.session.tick():
-                if event.kind is RuntimeEventKind.REMINDER_DUE:
-                    self._show_reminder(event.phase)
-                elif event.kind is RuntimeEventKind.SUSPEND_DETECTED:
-                    self._close_reminder(dismiss=False)
-                    self.audio.pause_ambient()
-                    self.pause_button.config(text="继续")
-                    messagebox.showinfo(
-                        "专注已暂停",
-                        "检测到电脑睡眠或长时间挂起。过期提醒已取消，请确认后继续。",
-                    )
-                elif event.kind is RuntimeEventKind.SESSION_FINISHED:
-                    self._show_break_prompt()
-                    return
             self._update_focus_display()
         if self.session.state not in {SessionState.IDLE, SessionState.BREAK_PROMPT, SessionState.SHUTTING_DOWN}:
             self._schedule_tick(generation)
@@ -1020,17 +1021,14 @@ class CountdownApp:
     def _toggle_pause(self) -> None:
         if self.session is None:
             return
-        if self.in_long_break:
+        if self.session.is_long_break:
             if self.session.state is SessionState.LONG_BREAK:
-                self.long_break_paused_remaining = max(
-                    0.0, (self.long_break_deadline or time.monotonic()) - time.monotonic()
-                )
-                self.session.state = SessionState.PAUSED
+                self.session.pause()
                 self.pause_button.config(text="继续")
             elif self.session.state is SessionState.PAUSED:
-                self.long_break_deadline = time.monotonic() + (self.long_break_paused_remaining or 0)
-                self.session.state = SessionState.LONG_BREAK
+                self.session.resume()
                 self.pause_button.config(text="暂停")
+            self._update_long_break_display()
             return
         if self.session.state is SessionState.FOCUSING:
             self.session.pause()
@@ -1067,24 +1065,18 @@ class CountdownApp:
         except ValueError as error:
             messagebox.showerror("输入错误", str(error))
             return
-        self.in_long_break = True
-        self.session.state = SessionState.LONG_BREAK
-        self.long_break_deadline = time.monotonic() + duration
-        self.long_break_paused_remaining = None
+        self.session.start_long_break(duration)
         self.break_prompt_frame.pack_forget()
         self.running_frame.pack(fill="both", expand=True)
         self.pause_button.config(text="暂停")
         self.render_cache.invalidate()
-        self._tick_long_break()
+        self._update_long_break_display()
         self._schedule_tick(self.session_generation)
 
-    def _tick_long_break(self) -> None:
+    def _update_long_break_display(self) -> None:
         if self.session is None:
             return
-        if self.session.state is SessionState.PAUSED:
-            remaining = self.long_break_paused_remaining or 0
-        else:
-            remaining = max(0.0, (self.long_break_deadline or time.monotonic()) - time.monotonic())
+        remaining = self.session.long_break_remaining_sec
         timer_text = self._format_seconds(remaining)
         phase_text = "大休息（已暂停）" if self.session.state is SessionState.PAUSED else "大休息"
         self.render_cache.update(
@@ -1097,11 +1089,6 @@ class CountdownApp:
             "interval", "休息期间不会产生随机提醒",
             lambda value: self.interval_label.config(text=value),
         )
-        if remaining <= 0 and self.session.state is SessionState.LONG_BREAK:
-            self.audio.play_bell(self._current_return_audio_path())
-            messagebox.showinfo("休息结束", "大休息结束，可以开始下一个周期。")
-            self.session.stop()
-            self._return_to_settings()
 
     def _skip_long_break(self) -> None:
         if self.session is not None:
@@ -1116,9 +1103,6 @@ class CountdownApp:
         self._close_reminder(dismiss=False)
         self.audio.stop_bell()
         self.audio.stop_ambient()
-        self.in_long_break = False
-        self.long_break_deadline = None
-        self.long_break_paused_remaining = None
         self.running_frame.pack_forget()
         self.break_prompt_frame.pack_forget()
         self.settings_frame.pack(fill="both", expand=True)
@@ -1314,7 +1298,7 @@ class CountdownApp:
         self.logger.info("Application shutting down")
         self.session_generation += 1
         if self.session is not None:
-            self.session.state = SessionState.SHUTTING_DOWN
+            self.session.shutdown()
         if self.tick_after_id is not None:
             try:
                 self.root.after_cancel(self.tick_after_id)

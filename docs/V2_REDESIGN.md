@@ -195,6 +195,7 @@ stateDiagram-v2
 ```
 
 提醒是否显示使用独立的 `ReminderState = NONE | VISIBLE`，不能创建第二套专注计时状态。
+`FocusSession` 是专注、大休息、暂停上下文和退出状态的唯一所有者；GUI 只消费领域事件并渲染，不能直接写入 `session.state` 或维护第二套截止时间。
 
 ### 6.2 单线程 GUI 调度
 

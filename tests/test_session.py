@@ -91,6 +91,82 @@ class FocusSessionTests(unittest.TestCase):
         )
         self.assertEqual([], session.tick())
 
+    def test_long_break_uses_the_same_monotonic_session_clock(self):
+        clock = FakeClock()
+        defaults = SessionSettings.defaults(
+            focus_duration_sec=60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        settings = replace(defaults, classic_interval=IntervalRange(90, 90))
+        session = FocusSession(settings, FixedRandom([90]), clock.now)
+        session.start()
+        for _ in range(6):
+            clock.advance(10)
+            session.tick()
+
+        session.start_long_break(20)
+        clock.advance(19)
+        self.assertEqual([], session.tick())
+        self.assertEqual(1, session.long_break_remaining_sec)
+        clock.advance(1)
+
+        events = session.tick()
+
+        self.assertEqual(SessionState.IDLE, session.state)
+        self.assertEqual(
+            [RuntimeEventKind.LONG_BREAK_FINISHED],
+            [event.kind for event in events],
+        )
+        self.assertEqual([], session.tick())
+
+    def test_long_break_pause_preserves_its_remaining_time_and_context(self):
+        clock = FakeClock()
+        defaults = SessionSettings.defaults(
+            focus_duration_sec=60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        settings = replace(defaults, classic_interval=IntervalRange(90, 90))
+        session = FocusSession(settings, FixedRandom([90]), clock.now)
+        session.start()
+        for _ in range(6):
+            clock.advance(10)
+            session.tick()
+        session.start_long_break(20)
+        clock.advance(5)
+        session.tick()
+
+        session.pause()
+        clock.advance(100)
+        self.assertEqual([], session.tick())
+
+        self.assertEqual(SessionState.PAUSED, session.state)
+        self.assertTrue(session.is_long_break)
+        self.assertEqual(15, session.long_break_remaining_sec)
+        session.resume()
+        self.assertEqual(SessionState.LONG_BREAK, session.state)
+        clock.advance(15)
+        events = session.tick()
+        self.assertEqual(
+            [RuntimeEventKind.LONG_BREAK_FINISHED],
+            [event.kind for event in events],
+        )
+        self.assertEqual(SessionState.IDLE, session.state)
+
+    def test_shutdown_is_a_session_transition_not_a_gui_state_write(self):
+        clock = FakeClock()
+        settings = SessionSettings.defaults(
+            focus_duration_sec=20 * 60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        session = FocusSession(settings, FixedRandom([180]), clock.now)
+        session.start()
+
+        session.shutdown()
+
+        self.assertEqual(SessionState.SHUTTING_DOWN, session.state)
+        self.assertEqual([], session.tick())
+        self.assertFalse(session.reminder_visible)
+
 
 if __name__ == "__main__":
     unittest.main()

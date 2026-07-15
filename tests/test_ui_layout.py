@@ -208,13 +208,11 @@ class SettingsActionLayoutTests(unittest.TestCase):
 
     def test_break_prompt_expands_to_show_every_action(self):
         self.app.settings_view.hide()
-        self.app.break_prompt_frame.pack(fill="both", expand=True)
-
-        self.app._apply_break_prompt_window_layout()
+        self.app.break_prompt_view.show()
         self.root.update_idletasks()
 
         self.assertGreaterEqual(
-            self.root.winfo_height(), self.app.break_prompt_frame.winfo_reqheight()
+            self.root.winfo_height(), self.app.break_prompt_view.required_height
         )
 
 

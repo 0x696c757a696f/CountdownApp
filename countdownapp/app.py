@@ -17,6 +17,7 @@ from . import __version__
 from .adaptive import AttentionFeedback
 from .ambient_async import AsyncAmbientController
 from .audio import AudioEngine, should_play_return_bell
+from .break_prompt_view import BreakPromptBindings, BreakPromptView
 from .config import AppSettings, ConfigStore
 from .domain import (
     IntervalRange,
@@ -34,7 +35,6 @@ from .presentation import (
     format_feedback_summary,
     format_reminder_status,
     responsive_window_layout,
-    runtime_window_layout,
 )
 from .resources import install_dir, resource_path
 from .reminder_view import (
@@ -326,34 +326,15 @@ class CountdownApp:
             tone_options=tuple(SOLFEGGIO_OPTIONS),
         )
 
-        self.break_prompt_frame = ttk.Frame(
-            self.root, padding=30, style="App.TFrame"
+        self.break_prompt_view = BreakPromptView(
+            self.root,
+            BreakPromptBindings(
+                duration_var=self.long_break_var,
+                on_start=self._start_long_break,
+                on_skip=self._skip_long_break,
+                on_shutdown=self._shutdown,
+            ),
         )
-        ttk.Label(
-            self.break_prompt_frame, text="专注完成", style="Title.TLabel"
-        ).pack(pady=30)
-        ttk.Label(
-            self.break_prompt_frame,
-            text="要开始大休息吗？休息期间不会产生随机提醒。",
-            style="Phase.TLabel",
-        ).pack(pady=12)
-        break_line = ttk.Frame(self.break_prompt_frame)
-        break_line.pack(pady=10)
-        ttk.Label(break_line, text="休息分钟数").pack(side="left")
-        ttk.Entry(
-            break_line, textvariable=self.long_break_var, width=8
-        ).pack(side="left", padx=8)
-        break_actions = ttk.Frame(self.break_prompt_frame)
-        break_actions.pack(pady=20)
-        ttk.Button(
-            break_actions, text="开始休息", command=self._start_long_break
-        ).pack(side="left", padx=5)
-        ttk.Button(
-            break_actions, text="跳过", command=self._skip_long_break
-        ).pack(side="left", padx=5)
-        ttk.Button(
-            break_actions, text="退出程序", command=self._shutdown
-        ).pack(side="left", padx=5)
 
     def _load_form(self, settings: AppSettings) -> None:
         self.settings_form.load(settings)
@@ -589,17 +570,6 @@ class CountdownApp:
     def _apply_runtime_window_layout(self) -> None:
         self.runtime_view.apply_window_layout()
 
-    def _apply_break_prompt_window_layout(self) -> None:
-        self.root.update_idletasks()
-        window_layout = runtime_window_layout(
-            self.root.winfo_screenwidth(),
-            self.root.winfo_screenheight(),
-            controls_expanded=False,
-            minimum_content_height=self.break_prompt_frame.winfo_reqheight(),
-        )
-        self.root.minsize(window_layout.min_width, window_layout.min_height)
-        self.root.geometry(window_layout.geometry)
-
     def _refresh_runtime_ambient_summary(self) -> None:
         self.runtime_view.set_ambient_summary(
             format_ambient_summary(
@@ -675,7 +645,7 @@ class CountdownApp:
             self.app_settings.ambient_volume / 100.0,
         )
         self.settings_view.hide()
-        self.break_prompt_frame.pack_forget()
+        self.break_prompt_view.hide()
         ambient_summary = format_ambient_summary(
             self.settings_form.ambient_value,
             self.settings_form.solfeggio_value,
@@ -820,8 +790,7 @@ class CountdownApp:
         self._stop_ambient_playback()
         self.floating_status.end_session()
         self.runtime_view.hide()
-        self.break_prompt_frame.pack(fill="both", expand=True)
-        self._apply_break_prompt_window_layout()
+        self.break_prompt_view.show()
         self.logger.info("Focus completed; waiting for long-break confirmation")
 
     def _start_long_break(self) -> None:
@@ -835,7 +804,7 @@ class CountdownApp:
             messagebox.showerror("输入错误", str(error))
             return
         self.session.start_long_break(duration)
-        self.break_prompt_frame.pack_forget()
+        self.break_prompt_view.hide()
         self.runtime_view.show_long_break()
         self.runtime_view.invalidate()
         self._update_long_break_display()
@@ -870,7 +839,7 @@ class CountdownApp:
         self._stop_ambient_playback()
         self.floating_status.end_session()
         self.runtime_view.hide()
-        self.break_prompt_frame.pack_forget()
+        self.break_prompt_view.hide()
         self.settings_view.show()
         self.runtime_view.invalidate()
         self.root.deiconify()

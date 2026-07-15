@@ -57,6 +57,33 @@ class ReminderSchedulerTests(unittest.TestCase):
         self.assertEqual(EventKind.SESSION_FINISHED, event.kind)
         self.assertEqual(90 * 60, event.due_active_sec)
 
+    def test_adaptive_multiplier_is_applied_after_the_secure_random_draw(self):
+        settings = SessionSettings.defaults(
+            focus_duration_sec=20 * 60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        scheduler = ReminderScheduler(settings, FixedRandom([4 * 60]))
+
+        event = scheduler.next_event(active_elapsed_sec=0, interval_multiplier=0.75)
+
+        self.assertEqual(EventKind.REMINDER_DUE, event.kind)
+        self.assertEqual(3 * 60, event.due_active_sec)
+
+    def test_phase_boundary_still_wins_over_an_adaptively_extended_interval(self):
+        settings = SessionSettings.defaults(
+            focus_duration_sec=90 * 60,
+            algorithm_mode=AlgorithmMode.V2,
+        )
+        scheduler = ReminderScheduler(settings, FixedRandom([7 * 60]))
+
+        event = scheduler.next_event(
+            active_elapsed_sec=29 * 60,
+            interval_multiplier=1.5,
+        )
+
+        self.assertEqual(EventKind.PHASE_CHANGED, event.kind)
+        self.assertEqual(30 * 60, event.due_active_sec)
+
 
 if __name__ == "__main__":
     unittest.main()

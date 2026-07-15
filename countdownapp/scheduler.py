@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import math
 from typing import Protocol
 
 from .domain import AlgorithmMode, IntervalRange, SessionSettings, V2Phase
@@ -38,7 +39,13 @@ class ReminderScheduler:
             return V2Phase.DEEP_FOCUS
         return V2Phase.FATIGUE_SUPPORT
 
-    def next_event(self, active_elapsed_sec: float) -> ScheduledEvent:
+    def next_event(
+        self,
+        active_elapsed_sec: float,
+        interval_multiplier: float = 1.0,
+    ) -> ScheduledEvent:
+        if not math.isfinite(interval_multiplier) or interval_multiplier <= 0:
+            raise ValueError("Interval multiplier must be positive and finite")
         if active_elapsed_sec >= self.settings.focus_duration_sec:
             return ScheduledEvent(
                 EventKind.SESSION_FINISHED,
@@ -48,9 +55,11 @@ class ReminderScheduler:
 
         phase = self.phase_at(active_elapsed_sec)
         interval = self._interval_for(phase)
-        candidate = active_elapsed_sec + self.random_source.randint(
+        sampled_interval = self.random_source.randint(
             interval.minimum_sec, interval.maximum_sec
         )
+        adjusted_interval = max(1, round(sampled_interval * interval_multiplier))
+        candidate = active_elapsed_sec + adjusted_interval
 
         phase_boundary = self._next_phase_boundary(phase)
         if phase_boundary is not None and candidate >= phase_boundary:

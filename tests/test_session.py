@@ -1,6 +1,7 @@
 import unittest
 from dataclasses import replace
 
+from countdownapp.adaptive import AttentionFeedback
 from countdownapp.domain import AlgorithmMode, IntervalRange, SessionSettings, SessionState
 from countdownapp.session import FocusSession, RuntimeEventKind
 
@@ -19,6 +20,40 @@ class FakeClock:
 
 
 class FocusSessionTests(unittest.TestCase):
+    def test_feedback_streak_changes_the_next_scheduled_reminder(self):
+        clock = FakeClock()
+        defaults = SessionSettings.defaults(
+            focus_duration_sec=10 * 60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        settings = replace(
+            defaults,
+            classic_interval=IntervalRange(60, 60),
+            adaptive_reminders_enabled=True,
+        )
+        session = FocusSession(settings, FixedRandom([60, 60, 60]), clock.now)
+        session.start()
+
+        for _ in range(6):
+            clock.advance(10)
+            events = session.tick()
+        self.assertEqual(
+            [RuntimeEventKind.REMINDER_DUE], [event.kind for event in events]
+        )
+        self.assertTrue(session.record_feedback(AttentionFeedback.DISTRACTED))
+        self.assertEqual(60, session.next_reminder_remaining_sec)
+
+        for _ in range(6):
+            clock.advance(10)
+            events = session.tick()
+        self.assertEqual(
+            [RuntimeEventKind.REMINDER_DUE], [event.kind for event in events]
+        )
+        self.assertTrue(session.record_feedback(AttentionFeedback.DISTRACTED))
+
+        self.assertEqual(45, session.next_reminder_remaining_sec)
+        self.assertEqual(2, session.feedback_summary.distracted_count)
+
     def test_exposes_next_reminder_as_remaining_active_time(self):
         clock = FakeClock()
         defaults = SessionSettings.defaults(

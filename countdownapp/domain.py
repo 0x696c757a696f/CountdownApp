@@ -60,6 +60,7 @@ class SessionSettings:
     microbreak_duration_sec: int = 10
     break_countdown_enabled: bool = True
     long_break_duration_sec: int = 20 * 60
+    adaptive_reminders_enabled: bool = False
 
     @classmethod
     def defaults(

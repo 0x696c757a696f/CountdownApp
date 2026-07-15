@@ -139,6 +139,7 @@ class ConfigStore:
                 "reminder_preset": session.reminder_preset.value,
                 "microbreak_duration_sec": session.microbreak_duration_sec,
                 "break_countdown_enabled": session.break_countdown_enabled,
+                "adaptive_reminders_enabled": session.adaptive_reminders_enabled,
                 "long_break_duration_sec": session.long_break_duration_sec,
                 "classic_interval": {
                     "minimum_sec": session.classic_interval.minimum_sec,
@@ -177,6 +178,9 @@ class ConfigStore:
             reminder_preset=ReminderPreset(raw_session["reminder_preset"]),
             microbreak_duration_sec=int(raw_session["microbreak_duration_sec"]),
             break_countdown_enabled=bool(raw_session.get("break_countdown_enabled", True)),
+            adaptive_reminders_enabled=bool(
+                raw_session.get("adaptive_reminders_enabled", False)
+            ),
             long_break_duration_sec=int(raw_session["long_break_duration_sec"]),
             classic_interval=decode_range(raw_session["classic_interval"]),
             v2=V2Settings(

@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 
+from .adaptive import (
+    AdaptiveReminderPolicy,
+    AttentionFeedback,
+    FeedbackSummary,
+)
 from .domain import SessionSettings, SessionState, V2Phase, validate_settings
 from .scheduler import EventKind, RandomSource, ReminderScheduler, ScheduledEvent
 
@@ -46,6 +51,7 @@ class FocusSession:
         self._scheduled: ScheduledEvent | None = None
         self._long_break_remaining_sec: float | None = None
         self._paused_from: SessionState | None = None
+        self._adaptive = AdaptiveReminderPolicy(settings.adaptive_reminders_enabled)
 
     @property
     def remaining_sec(self) -> float:
@@ -54,6 +60,10 @@ class FocusSession:
     @property
     def current_phase(self) -> V2Phase | None:
         return self._scheduler.phase_at(self.active_elapsed_sec)
+
+    @property
+    def feedback_summary(self) -> FeedbackSummary:
+        return self._adaptive.summary
 
     @property
     def next_reminder_remaining_sec(self) -> float | None:
@@ -73,6 +83,9 @@ class FocusSession:
         )
 
     def start(self) -> None:
+        self._adaptive = AdaptiveReminderPolicy(
+            self.settings.adaptive_reminders_enabled
+        )
         self.state = SessionState.FOCUSING
         self.active_elapsed_sec = 0.0
         self.reminder_visible = False
@@ -196,6 +209,21 @@ class FocusSession:
         self.reminder_visible = False
         if self.state is SessionState.FOCUSING:
             self._scheduled = self._scheduler.next_event(self.active_elapsed_sec)
+
+    def record_feedback(self, feedback: AttentionFeedback) -> bool:
+        if (
+            not self.settings.adaptive_reminders_enabled
+            or not self.reminder_visible
+            or self.state is not SessionState.FOCUSING
+        ):
+            return False
+        self._adaptive.record(feedback)
+        self.reminder_visible = False
+        self._scheduled = self._scheduler.next_event(
+            self.active_elapsed_sec,
+            interval_multiplier=self._adaptive.consume_multiplier(),
+        )
+        return True
 
     def stop(self) -> None:
         self.state = SessionState.IDLE

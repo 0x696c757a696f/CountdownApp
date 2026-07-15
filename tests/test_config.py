@@ -27,6 +27,7 @@ class ConfigStoreTests(unittest.TestCase):
                         **session.__dict__,
                         "reminder_preset": ReminderPreset.STRONG,
                         "break_countdown_enabled": False,
+                        "adaptive_reminders_enabled": True,
                     }
                 ),
                 audio_choice="custom",

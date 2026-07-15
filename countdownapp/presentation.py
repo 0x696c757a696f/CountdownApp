@@ -4,8 +4,19 @@ from collections.abc import Callable
 import math
 from typing import TypeVar
 
+from .adaptive import FeedbackSummary
+
 
 T = TypeVar("T")
+
+
+def format_feedback_summary(summary: FeedbackSummary, enabled: bool) -> str:
+    if not enabled:
+        return ""
+    return (
+        f"本轮反馈：仍在任务 {summary.on_task_count} · "
+        f"走神 {summary.distracted_count} · 心流延后 {summary.flow_count}"
+    )
 
 
 def format_reminder_status(
@@ -13,12 +24,16 @@ def format_reminder_status(
     maximum_sec: int,
     show_next_reminder: bool,
     next_reminder_remaining_sec: float | None,
+    adaptive_enabled: bool = False,
 ) -> str:
     def minutes(seconds: int) -> str:
         value = seconds / 60
         return str(int(value)) if value.is_integer() else f"{value:.2f}".rstrip("0")
 
-    text = f"当前随机区间：{minutes(minimum_sec)}–{minutes(maximum_sec)} 分钟"
+    range_label = "当前基础随机区间" if adaptive_enabled else "当前随机区间"
+    text = f"{range_label}：{minutes(minimum_sec)}–{minutes(maximum_sec)} 分钟"
+    if adaptive_enabled:
+        text = f"{text} ｜ 自适应反馈开启"
     if not show_next_reminder:
         return text
     if next_reminder_remaining_sec is None:

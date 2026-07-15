@@ -11,6 +11,7 @@ from pathlib import Path
 from secrets import SystemRandom
 from tkinter import filedialog, messagebox, ttk
 
+from .adaptive import AttentionFeedback
 from .audio import AudioEngine, should_play_return_bell
 from .config import AppSettings, ConfigStore
 from .domain import (
@@ -26,7 +27,11 @@ from .domain import (
 from .floating import FloatingStatusController, TkFloatingStatusView
 from .hotkeys import GlobalHotkeyService
 from .logging_config import configure_logging
-from .presentation import RenderCache, format_reminder_status
+from .presentation import (
+    RenderCache,
+    format_feedback_summary,
+    format_reminder_status,
+)
 from .resources import install_dir, resource_path
 from .session import FocusSession, RuntimeEventKind
 from .startup import StartupManager, StartupMode, should_start_hidden
@@ -270,6 +275,7 @@ class CountdownApp:
         self.preset_var = tk.StringVar()
         self.microbreak_var = tk.StringVar()
         self.break_countdown_var = tk.BooleanVar()
+        self.adaptive_var = tk.BooleanVar()
         self.long_break_var = tk.StringVar()
         self.audio_var = tk.StringVar()
         self.return_audio_var = tk.StringVar()
@@ -417,6 +423,12 @@ class CountdownApp:
             state="readonly",
             width=18,
         ).grid(row=0, column=1, sticky="ew", padx=(12, 8), pady=4)
+        ttk.Checkbutton(
+            self.more_frame,
+            text="根据反馈自适应下一次间隔",
+            variable=self.adaptive_var,
+            style="Form.TCheckbutton",
+        ).grid(row=0, column=2, columnspan=2, sticky="w", pady=4)
 
         ttk.Label(self.more_frame, text="微休息开始铃", style="Form.TLabel").grid(
             row=1, column=0, sticky="e", pady=4
@@ -584,6 +596,8 @@ class CountdownApp:
         self.phase_label.pack(pady=8)
         self.interval_label = ttk.Label(self.running_frame, text="", style="Phase.TLabel")
         self.interval_label.pack(pady=4)
+        self.feedback_label = ttk.Label(self.running_frame, text="", style="Phase.TLabel")
+        self.feedback_label.pack(pady=4)
         running_actions = ttk.Frame(self.running_frame)
         running_actions.pack(pady=25)
         self.pause_button = ttk.Button(running_actions, text="暂停", command=self._toggle_pause)
@@ -665,6 +679,7 @@ class CountdownApp:
         self.preset_var.set("强干预" if session.reminder_preset is ReminderPreset.STRONG else "平衡")
         self.microbreak_var.set(str(session.microbreak_duration_sec))
         self.break_countdown_var.set(session.break_countdown_enabled)
+        self.adaptive_var.set(session.adaptive_reminders_enabled)
         self.long_break_var.set(self._number(session.long_break_duration_sec / 60))
         selected_name = next(
             (name for name, value in AUDIO_OPTIONS.items() if value == settings.audio_choice),
@@ -981,6 +996,7 @@ class CountdownApp:
             microbreak_duration_sec=self._positive_int(self.microbreak_var.get(), "微休息"),
             break_countdown_enabled=self.break_countdown_var.get(),
             long_break_duration_sec=self._minutes(self.long_break_var.get(), "大休息"),
+            adaptive_reminders_enabled=self.adaptive_var.get(),
         )
         errors = validate_settings(settings)
         if errors:
@@ -1193,10 +1209,20 @@ class CountdownApp:
             interval.maximum_sec,
             self.app_settings.show_next_reminder,
             self.session.next_reminder_remaining_sec,
+            adaptive_enabled=self.session.settings.adaptive_reminders_enabled,
         )
         self.render_cache.update(
             "interval", interval_text,
             lambda value: self.interval_label.config(text=value),
+        )
+        feedback_text = format_feedback_summary(
+            self.session.feedback_summary,
+            self.session.settings.adaptive_reminders_enabled,
+        )
+        self.render_cache.update(
+            "feedback",
+            feedback_text,
+            lambda value: self.feedback_label.config(text=value),
         )
         self.floating_status.update(timer_text, phase_text)
 
@@ -1288,6 +1314,9 @@ class CountdownApp:
             "interval", "休息期间不会产生随机提醒",
             lambda value: self.interval_label.config(text=value),
         )
+        self.render_cache.update(
+            "feedback", "", lambda value: self.feedback_label.config(text=value)
+        )
 
     def _skip_long_break(self) -> None:
         if self.session is not None:
@@ -1313,13 +1342,20 @@ class CountdownApp:
         if self.session is None:
             return
         preset = self.session.settings.reminder_preset
+        adaptive = self.session.settings.adaptive_reminders_enabled
         if not self.session.settings.break_countdown_enabled:
+            if adaptive:
+                self._show_banner("我还在原任务上吗？", 8)
+                return
             self.tray.notify("CountdownApp", "微休息提醒：放松视线，确认当前任务。")
             self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
             self.session.dismiss_reminder()
             return
         if phase is V2Phase.DEEP_FOCUS:
+            if adaptive:
+                self._show_banner("深度专注：放松视线，确认任务方向。", 8)
+                return
             notified = self.tray.notify("CountdownApp", "深度专注提醒：放松视线，确认任务方向。")
             self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
@@ -1330,6 +1366,8 @@ class CountdownApp:
             return
         if phase is V2Phase.ATTENTION_ANCHOR:
             duration = 5 if preset is ReminderPreset.BALANCED else self.session.settings.microbreak_duration_sec
+            if adaptive:
+                duration = max(8, duration)
             self._show_banner("我还在原任务上吗？", duration)
             return
         self._show_overlay(self.session.settings.microbreak_duration_sec, preset)
@@ -1340,13 +1378,37 @@ class CountdownApp:
         self.reminder_window = window
         window.title("CountdownApp 提醒")
         window.attributes("-topmost", True)
-        width, height = 460, 150
+        adaptive = bool(
+            self.session is not None
+            and self.session.settings.adaptive_reminders_enabled
+        )
+        width, height = 560 if adaptive else 460, 195 if adaptive else 150
         x = max(0, (window.winfo_screenwidth() - width) // 2)
         window.geometry(f"{width}x{height}+{x}+40")
         body = ttk.Frame(window, padding=18)
         body.pack(fill="both", expand=True)
         ttk.Label(body, text=message, font=("Microsoft YaHei UI", 16, "bold")).pack(pady=8)
-        ttk.Button(body, text="跳过", command=self._close_reminder).pack()
+        actions = ttk.Frame(body)
+        actions.pack(pady=5)
+        if adaptive:
+            ttk.Button(
+                actions,
+                text="仍在任务",
+                command=lambda: self._submit_feedback(AttentionFeedback.ON_TASK),
+            ).pack(side="left", padx=4)
+            ttk.Button(
+                actions,
+                text="刚才走神",
+                command=lambda: self._submit_feedback(AttentionFeedback.DISTRACTED),
+            ).pack(side="left", padx=4)
+            ttk.Button(
+                actions,
+                text="心流中，延后",
+                command=lambda: self._submit_feedback(AttentionFeedback.FLOW),
+            ).pack(side="left", padx=4)
+        ttk.Button(actions, text="跳过", command=self._close_reminder).pack(
+            side="left", padx=4
+        )
         window.bind("<Escape>", lambda _event: self._close_reminder())
         window.protocol("WM_DELETE_WINDOW", self._close_reminder)
         self.reminder_after_id = self.root.after(
@@ -1373,13 +1435,30 @@ class CountdownApp:
             bg="black",
         )
         label.pack(expand=True)
-        button = tk.Button(
-            window,
+        actions = tk.Frame(window, bg="black")
+        actions.pack(pady=30)
+        adaptive = bool(
+            self.session is not None
+            and self.session.settings.adaptive_reminders_enabled
+        )
+        if adaptive:
+            for text, feedback in (
+                ("仍在任务", AttentionFeedback.ON_TASK),
+                ("刚才走神", AttentionFeedback.DISTRACTED),
+                ("心流中，延后", AttentionFeedback.FLOW),
+            ):
+                tk.Button(
+                    actions,
+                    text=text,
+                    command=lambda value=feedback: self._submit_feedback(value),
+                    font=("Microsoft YaHei UI", 14),
+                ).pack(side="left", padx=6)
+        tk.Button(
+            actions,
             text="跳过（Esc）",
             command=self._close_reminder,
             font=("Microsoft YaHei UI", 14),
-        )
-        button.pack(pady=30)
+        ).pack(side="left", padx=6)
         window.bind("<Escape>", lambda _event: self._close_reminder())
         deadline = time.monotonic() + duration_sec
         overlay_cache = RenderCache()
@@ -1400,6 +1479,13 @@ class CountdownApp:
 
         update()
         self.audio.play_bell(self._current_audio_path())
+
+    def _submit_feedback(self, feedback: AttentionFeedback) -> None:
+        if self.session is None or not self.session.record_feedback(feedback):
+            return
+        self.logger.info("Attention feedback recorded: %s", feedback.value)
+        self._close_reminder(dismiss=False)
+        self._update_focus_display()
 
     def _close_reminder(
         self,

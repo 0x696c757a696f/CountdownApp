@@ -50,6 +50,7 @@ class ConfigStore:
     def __init__(self, path: Path | None = None):
         self.path = path or default_config_path()
         self.last_recovery_path: Path | None = None
+        self.last_save_error: OSError | None = None
 
     def load(self) -> AppSettings:
         if not self.path.exists():
@@ -103,7 +104,10 @@ class ConfigStore:
             custom_audio_path=custom_audio_path,
             migration_completed=True,
         )
-        self.save(settings)
+        try:
+            self.save(settings)
+        except OSError as error:
+            self.last_save_error = error
         return settings
 
     @staticmethod

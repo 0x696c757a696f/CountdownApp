@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from secrets import SystemRandom
+from types import TracebackType
 from tkinter import filedialog, messagebox, ttk
 
 from .adaptive import AttentionFeedback
@@ -39,6 +40,7 @@ from .presentation import (
 )
 from .resources import install_dir, resource_path
 from .session import FocusSession, RuntimeEventKind
+from .single_instance import SingleInstanceGuard, show_native_message
 from .startup import StartupManager, StartupMode, should_start_hidden
 from .tray import TrayService
 
@@ -115,6 +117,11 @@ class CountdownApp:
         self.app_settings = self.store.migrate_legacy(
             [install_dir() / "settings.ini", Path.cwd() / "settings.ini"]
         )
+        if self.store.last_save_error is not None:
+            self.logger.warning(
+                "Initial settings could not be saved: %s",
+                self.store.last_save_error,
+            )
         self.audio = AudioEngine(logger=self.logger)
         self.startup_manager = StartupManager()
         try:
@@ -172,6 +179,17 @@ class CountdownApp:
                         "配置已恢复",
                         f"原配置无法读取，已保留为 {backup_name}，本次使用默认设置。",
                     ),
+                )
+        if self.store.last_save_error is not None:
+            warning = (
+                "安装目录不可写，本次将使用内存默认设置；关闭程序后更改不会保留。"
+            )
+            if start_hidden:
+                self.tray.notify("CountdownApp 配置未保存", warning)
+            else:
+                self.root.after(
+                    0,
+                    lambda: messagebox.showwarning("配置无法保存", warning),
                 )
         if hotkey_start_failed and not start_hidden:
             self.root.after(
@@ -1977,6 +1995,57 @@ class CountdownApp:
 
 
 def run() -> None:
-    root = tk.Tk()
-    CountdownApp(root)
-    root.mainloop()
+    guard = SingleInstanceGuard()
+    try:
+        acquired = guard.acquire()
+    except OSError as error:
+        show_native_message(
+            "CountdownApp 启动失败",
+            f"无法建立单实例保护：{error}",
+            error=True,
+        )
+        return
+    if not acquired:
+        show_native_message(
+            "CountdownApp 已在运行",
+            "程序已经启动，主界面可能已隐藏在系统托盘中。",
+        )
+        return
+
+    logger = configure_logging()
+    root: tk.Tk | None = None
+    try:
+        root = tk.Tk()
+
+        def report_callback_exception(
+            exception_type: type[BaseException],
+            error: BaseException,
+            traceback: TracebackType | None,
+        ) -> None:
+            logger.error(
+                "Unhandled Tk callback exception",
+                exc_info=(exception_type, error, traceback),
+            )
+            messagebox.showerror(
+                "CountdownApp 发生错误",
+                f"操作执行失败：{error}\n\n详情已写入 Logs。",
+                parent=root,
+            )
+
+        root.report_callback_exception = report_callback_exception
+        CountdownApp(root)
+        root.mainloop()
+    except Exception as error:
+        logger.exception("Fatal application startup error")
+        show_native_message(
+            "CountdownApp 启动失败",
+            f"程序无法启动：{error}\n\n请查看安装目录中的 Logs。",
+            error=True,
+        )
+    finally:
+        if root is not None:
+            try:
+                root.destroy()
+            except tk.TclError:
+                pass
+        guard.release()

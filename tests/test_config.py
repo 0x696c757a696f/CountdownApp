@@ -8,6 +8,18 @@ from countdownapp.domain import AlgorithmMode, ReminderPreset, SessionSettings
 
 
 class ConfigStoreTests(unittest.TestCase):
+    def test_first_launch_continues_with_defaults_when_config_cannot_be_written(self):
+        class UnwritableStore(ConfigStore):
+            def save(self, settings):
+                raise PermissionError("read-only install directory")
+
+        store = UnwritableStore(Path("unwritable") / "settings.json")
+
+        loaded = store.migrate_legacy([])
+
+        self.assertEqual(AppSettings(migration_completed=True), loaded)
+        self.assertIsInstance(store.last_save_error, PermissionError)
+
     def test_new_install_uses_the_requested_default_bells(self):
         settings = AppSettings()
 

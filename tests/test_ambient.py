@@ -1,64 +1,9 @@
 import unittest
 
-from countdownapp.ambient import AmbientAudioService, synthesize_mix, synthesize_mono
-
-
-class RecordingBackend:
-    def __init__(self):
-        self.events = []
-
-    def play(self, kind, volume):
-        self.events.append(("play", kind, volume))
-
-    def set_volume(self, volume):
-        self.events.append(("volume", volume))
-
-    def pause(self):
-        self.events.append(("pause",))
-
-    def resume(self):
-        self.events.append(("resume",))
-
-    def stop(self):
-        self.events.append(("stop",))
-
-    def close(self):
-        self.events.append(("close",))
+from countdownapp.ambient import synthesize_mix, synthesize_mono
 
 
 class AmbientSynthesisTests(unittest.TestCase):
-    def test_continuous_service_controls_one_looping_backend(self):
-        backend = RecordingBackend()
-        service = AmbientAudioService(backend_factory=lambda: backend)
-
-        service.play("pink", 0.2)
-        service.set_volume(0.35)
-        service.pause()
-        service.resume()
-        service.stop()
-        service.close()
-
-        self.assertEqual(
-            [
-                ("play", "pink", 0.2),
-                ("volume", 0.35),
-                ("pause",),
-                ("resume",),
-                ("stop",),
-                ("stop",),
-                ("close",),
-            ],
-            backend.events,
-        )
-
-    def test_service_can_play_noise_and_tone_as_one_continuous_mix(self):
-        backend = RecordingBackend()
-        service = AmbientAudioService(backend_factory=lambda: backend)
-
-        service.play_layers("pink", "tone:528", 0.2)
-
-        self.assertEqual([("play", ("pink", "tone:528"), 0.2)], backend.events)
-
     def test_noise_and_tone_can_be_synthesized_as_a_bounded_mix(self):
         noise = synthesize_mono(
             "pink", sample_rate=8_000, duration_sec=0.25, seed=42

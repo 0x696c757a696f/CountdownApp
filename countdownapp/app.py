@@ -10,8 +10,7 @@ from pathlib import Path
 from secrets import SystemRandom
 from tkinter import filedialog, messagebox, ttk
 
-from .audio import AudioService, should_play_return_bell
-from .ambient import AmbientAudioService
+from .audio import AudioEngine, should_play_return_bell
 from .config import AppSettings, ConfigStore
 from .domain import (
     AlgorithmMode,
@@ -87,8 +86,7 @@ class CountdownApp:
         self.app_settings = self.store.migrate_legacy(
             [install_dir() / "settings.ini", Path.cwd() / "settings.ini"]
         )
-        self.audio = AudioService(logger=self.logger)
-        self.ambient = AmbientAudioService(logger=self.logger)
+        self.audio = AudioEngine(logger=self.logger)
         self.startup_manager = StartupManager()
         try:
             self.startup_mode = self.startup_manager.get_mode()
@@ -408,7 +406,7 @@ class CountdownApp:
             self.more_frame, text="试听组合", command=self._preview_ambient
         ).grid(row=3, column=2, padx=4, pady=(12, 4))
         ttk.Button(
-            self.more_frame, text="停止", command=self.ambient.stop
+            self.more_frame, text="停止", command=self.audio.stop_ambient
         ).grid(row=3, column=3, pady=(12, 4))
 
         ttk.Label(self.more_frame, text="Solfeggio 频率", style="Form.TLabel").grid(
@@ -862,7 +860,7 @@ class CountdownApp:
         return min(1.0, max(0.0, self.ambient_volume_var.get() / 100.0))
 
     def _preview_ambient(self) -> None:
-        self.ambient.play_layers(
+        self.audio.play_ambient(
             self._current_ambient_value(),
             self._current_solfeggio_value(),
             self._ambient_volume(),
@@ -871,7 +869,7 @@ class CountdownApp:
     def _on_ambient_volume_changed(self, value: str) -> None:
         volume = min(100, max(0, round(float(value))))
         self.ambient_volume_label_var.set(f"{volume}%")
-        self.ambient.set_volume(volume / 100.0)
+        self.audio.set_ambient_volume(volume / 100.0)
 
     def _choose_audio(self, is_return: bool) -> None:
         selected = filedialog.askopenfilename(
@@ -892,7 +890,13 @@ class CountdownApp:
         if value == "custom" and not path.is_file():
             messagebox.showerror("音频错误", "请先选择有效的自定义音频文件。")
             return
-        self.audio.play(path)
+        if not self.audio.play_bell(path):
+            messagebox.showwarning(
+                "音频播放失败",
+                "所选音频无法播放，已尝试 Windows 系统提示音。详情请查看 Logs。",
+            )
+            return
+        self._stop_audio_later(5)
 
     def _start_focus(self) -> None:
         try:
@@ -922,7 +926,7 @@ class CountdownApp:
         self.session_generation += 1
         self.session = FocusSession(settings, SystemRandom(), time.monotonic)
         self.session.start()
-        self.ambient.play_layers(
+        self.audio.play_ambient(
             self.app_settings.ambient_choice,
             self.app_settings.solfeggio_choice,
             self.app_settings.ambient_volume / 100.0,
@@ -961,7 +965,7 @@ class CountdownApp:
                     self._show_reminder(event.phase)
                 elif event.kind is RuntimeEventKind.SUSPEND_DETECTED:
                     self._close_reminder(dismiss=False)
-                    self.ambient.pause()
+                    self.audio.pause_ambient()
                     self.pause_button.config(text="继续")
                     messagebox.showinfo(
                         "专注已暂停",
@@ -1030,11 +1034,11 @@ class CountdownApp:
             return
         if self.session.state is SessionState.FOCUSING:
             self.session.pause()
-            self.ambient.pause()
+            self.audio.pause_ambient()
             self.pause_button.config(text="继续")
         elif self.session.state is SessionState.PAUSED:
             self.session.resume()
-            self.ambient.resume()
+            self.audio.resume_ambient()
             self.pause_button.config(text="暂停")
         self._update_focus_display()
 
@@ -1049,8 +1053,8 @@ class CountdownApp:
 
     def _show_break_prompt(self) -> None:
         self._close_reminder(dismiss=False)
-        self.audio.stop()
-        self.ambient.stop()
+        self.audio.stop_bell()
+        self.audio.stop_ambient()
         self.running_frame.pack_forget()
         self.break_prompt_frame.pack(fill="both", expand=True)
         self.logger.info("Focus completed; waiting for long-break confirmation")
@@ -1094,7 +1098,7 @@ class CountdownApp:
             lambda value: self.interval_label.config(text=value),
         )
         if remaining <= 0 and self.session.state is SessionState.LONG_BREAK:
-            self.audio.play(self._current_return_audio_path())
+            self.audio.play_bell(self._current_return_audio_path())
             messagebox.showinfo("休息结束", "大休息结束，可以开始下一个周期。")
             self.session.stop()
             self._return_to_settings()
@@ -1110,8 +1114,8 @@ class CountdownApp:
             self.root.after_cancel(self.tick_after_id)
             self.tick_after_id = None
         self._close_reminder(dismiss=False)
-        self.audio.stop()
-        self.ambient.stop()
+        self.audio.stop_bell()
+        self.audio.stop_ambient()
         self.in_long_break = False
         self.long_break_deadline = None
         self.long_break_paused_remaining = None
@@ -1127,13 +1131,13 @@ class CountdownApp:
         preset = self.session.settings.reminder_preset
         if not self.session.settings.break_countdown_enabled:
             self.tray.notify("CountdownApp", "微休息提醒：放松视线，确认当前任务。")
-            self.audio.play(self._current_audio_path())
+            self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
             self.session.dismiss_reminder()
             return
         if phase is V2Phase.DEEP_FOCUS:
             notified = self.tray.notify("CountdownApp", "深度专注提醒：放松视线，确认任务方向。")
-            self.audio.play(self._current_audio_path())
+            self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
             if notified:
                 self.session.dismiss_reminder()
@@ -1165,7 +1169,7 @@ class CountdownApp:
             duration_sec * 1000,
             lambda: self._close_reminder(completed_automatically=True),
         )
-        self.audio.play(self._current_audio_path())
+        self.audio.play_bell(self._current_audio_path())
 
     def _show_overlay(self, duration_sec: int, preset: ReminderPreset) -> None:
         self._close_reminder(dismiss=False)
@@ -1211,7 +1215,7 @@ class CountdownApp:
                 self.reminder_after_id = self.root.after(self.OVERLAY_TICK_MS, update)
 
         update()
-        self.audio.play(self._current_audio_path())
+        self.audio.play_bell(self._current_audio_path())
 
     def _close_reminder(
         self,
@@ -1236,7 +1240,7 @@ class CountdownApp:
                 window.destroy()
             except tk.TclError:
                 pass
-        self.audio.stop()
+        self.audio.stop_bell()
         if dismiss and self.session is not None:
             self.session.dismiss_reminder()
         countdown_enabled = bool(
@@ -1246,7 +1250,7 @@ class CountdownApp:
             countdown_enabled=countdown_enabled,
             completed_automatically=completed_automatically,
         ):
-            self.audio.play(self._current_return_audio_path())
+            self.audio.play_bell(self._current_return_audio_path())
             self._stop_audio_later(5)
 
     def _stop_audio_later(self, seconds: int) -> None:
@@ -1259,12 +1263,12 @@ class CountdownApp:
 
     def _stop_scheduled_audio(self) -> None:
         self.audio_after_id = None
-        self.audio.stop()
+        self.audio.stop_bell()
 
     def _minimize_to_tray(self) -> None:
         if self.tray.available:
             if self.session is None or self.session.state is SessionState.IDLE:
-                self.ambient.stop()
+                self.audio.stop_ambient()
             self.root.withdraw()
         else:
             messagebox.showwarning("托盘不可用", "系统托盘初始化失败，窗口不能隐藏。")
@@ -1324,7 +1328,6 @@ class CountdownApp:
                 pass
             self.tray_after_id = None
         self._close_reminder(dismiss=False)
-        self.ambient.close()
         self.audio.close()
         self.tray.stop()
         try:

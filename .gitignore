@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+build/
+.pyinstaller-build/
+.pyinstaller-build-staging/
+dist/
+dist-staging/
+*.log
+/settings.json
+/Logs/

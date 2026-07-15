@@ -111,7 +111,7 @@ def format_feedback_summary(summary: FeedbackSummary, enabled: bool) -> str:
         return ""
     return (
         f"本轮反馈：仍在任务 {summary.on_task_count} · "
-        f"走神 {summary.distracted_count} · 心流延后 {summary.flow_count}"
+        f"走神 {summary.distracted_count} · 延后下次提醒 {summary.flow_count}"
     )
 
 

@@ -65,7 +65,7 @@ class FeedbackSummaryTests(unittest.TestCase):
         summary = FeedbackSummary(on_task_count=3, distracted_count=2, flow_count=1)
 
         self.assertEqual(
-            "本轮反馈：仍在任务 3 · 走神 2 · 心流延后 1",
+            "本轮反馈：仍在任务 3 · 走神 2 · 延后下次提醒 1",
             format_feedback_summary(summary, True),
         )
 

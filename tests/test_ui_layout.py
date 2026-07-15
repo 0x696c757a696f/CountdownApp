@@ -79,7 +79,7 @@ class SettingsActionLayoutTests(unittest.TestCase):
         }
 
         self.assertIn(
-            "在提醒中显示反馈按钮：仍在任务 / 刚才走神 / 心流延后",
+            "在提醒中显示反馈按钮：仍在任务 / 刚才走神 / 正在心流，延后下次提醒",
             labels,
         )
         self.assertIn("根据反馈自动调整下一次提醒间隔", labels)

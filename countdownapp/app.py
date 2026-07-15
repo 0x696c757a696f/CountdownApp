@@ -50,6 +50,8 @@ PHASE_NAMES = {
     V2Phase.FATIGUE_SUPPORT: "疲劳维护期",
 }
 
+FLOW_FEEDBACK_LABEL = "正在心流，延后下次提醒"
+
 AUDIO_OPTIONS = {
     "提示音 0": "0.wav",
     "提示音 1": "1.wav",
@@ -465,7 +467,10 @@ class CountdownApp:
         ).grid(row=0, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         ttk.Checkbutton(
             reminder_section,
-            text="在提醒中显示反馈按钮：仍在任务 / 刚才走神 / 心流延后",
+            text=(
+                "在提醒中显示反馈按钮：仍在任务 / 刚才走神 / "
+                f"{FLOW_FEEDBACK_LABEL}"
+            ),
             variable=self.adaptive_var,
             style="Form.TCheckbutton",
         ).grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
@@ -1759,7 +1764,7 @@ class CountdownApp:
             ).pack(side="left", padx=4)
             ttk.Button(
                 actions,
-                text="心流中，延后",
+                text=FLOW_FEEDBACK_LABEL,
                 command=lambda: self._submit_feedback(AttentionFeedback.FLOW),
             ).pack(side="left", padx=4)
         ttk.Button(actions, text="跳过", command=self._close_reminder).pack(
@@ -1801,7 +1806,7 @@ class CountdownApp:
             for text, feedback in (
                 ("仍在任务", AttentionFeedback.ON_TASK),
                 ("刚才走神", AttentionFeedback.DISTRACTED),
-                ("心流中，延后", AttentionFeedback.FLOW),
+                (FLOW_FEEDBACK_LABEL, AttentionFeedback.FLOW),
             ):
                 tk.Button(
                     actions,

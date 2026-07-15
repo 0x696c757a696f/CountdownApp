@@ -119,3 +119,52 @@ def validate_settings(settings: SessionSettings) -> list[str]:
     if settings.long_break_duration_sec <= 0:
         errors.append("大休息时长必须大于 0。")
     return errors
+
+
+def reminder_coverage_warnings(settings: SessionSettings) -> list[str]:
+    """Describe valid schedules whose random range may yield no reminder."""
+
+    def warning_for(
+        label: str, duration_sec: int, interval: IntervalRange
+    ) -> str | None:
+        duration_minutes = f"{duration_sec / 60:.1f}".rstrip("0").rstrip(".")
+        if duration_sec <= interval.minimum_sec:
+            return (
+                f"{label}约 {duration_minutes} 分钟，不长于最小随机间隔，"
+                "不会产生随机提醒。"
+            )
+        if duration_sec <= interval.maximum_sec:
+            return (
+                f"{label}约 {duration_minutes} 分钟，短于最大随机间隔，"
+                "本轮可能没有提醒。"
+            )
+        return None
+
+    if settings.algorithm_mode is AlgorithmMode.CLASSIC:
+        warning = warning_for(
+            "本次专注", settings.focus_duration_sec, settings.classic_interval
+        )
+        return [warning] if warning else []
+
+    phases = (
+        (
+            "注意力锚定期",
+            settings.v2.anchor_end_sec,
+            settings.v2.anchor_interval,
+        ),
+        (
+            "深度专注期",
+            settings.v2.fatigue_start_sec - settings.v2.anchor_end_sec,
+            settings.v2.deep_focus_interval,
+        ),
+        (
+            "疲劳维护期",
+            settings.focus_duration_sec - settings.v2.fatigue_start_sec,
+            settings.v2.fatigue_interval,
+        ),
+    )
+    return [
+        warning
+        for label, duration, interval in phases
+        if (warning := warning_for(label, duration, interval)) is not None
+    ]

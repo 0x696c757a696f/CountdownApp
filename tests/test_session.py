@@ -123,6 +123,28 @@ class FocusSessionTests(unittest.TestCase):
         self.assertEqual([RuntimeEventKind.REMINDER_DUE], [event.kind for event in events])
         self.assertEqual(60, session.active_elapsed_sec)
 
+    def test_pausing_during_a_visible_reminder_cancels_and_resamples_it(self):
+        clock = FakeClock()
+        defaults = SessionSettings.defaults(
+            focus_duration_sec=10 * 60,
+            algorithm_mode=AlgorithmMode.CLASSIC,
+        )
+        settings = replace(defaults, classic_interval=IntervalRange(10, 20))
+        session = FocusSession(settings, FixedRandom([10, 20]), clock.now)
+        session.start()
+        clock.advance(10)
+        self.assertEqual(
+            [RuntimeEventKind.REMINDER_DUE],
+            [event.kind for event in session.tick()],
+        )
+
+        session.pause()
+
+        self.assertEqual(SessionState.PAUSED, session.state)
+        self.assertFalse(session.reminder_visible)
+        session.resume()
+        self.assertEqual(20, session.next_reminder_remaining_sec)
+
     def test_long_callback_gap_auto_pauses_without_counting_the_gap(self):
         clock = FakeClock()
         settings = SessionSettings.defaults(

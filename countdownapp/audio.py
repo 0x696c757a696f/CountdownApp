@@ -49,24 +49,25 @@ class AudioEngine:
         self._ambient_paused = False
         self._bell_active = False
 
-    def play_ambient(self, noise: str, tone: str, volume: float) -> None:
+    def play_ambient(self, noise: str, tone: str, volume: float) -> bool:
         sources = tuple(source for source in (noise, tone) if source != "off")
         if not sources:
             self.stop_ambient()
-            return
+            return True
         self._ambient_sources = sources
         self._ambient_volume = min(1.0, max(0.0, float(volume)))
         self._ambient_paused = False
         for attempt in range(2):
             try:
                 self._get_backend().play_ambient(sources, self._ambient_volume)
-                return
+                return True
             except Exception as error:
                 self._logger.warning(
                     "Ambient playback attempt %s failed: %s", attempt + 1, error
                 )
                 self._reset_backend()
         self._ambient_sources = ()
+        return False
 
     def play_bell(self, path: str | Path) -> bool:
         self._bell_active = False

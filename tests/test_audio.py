@@ -158,13 +158,23 @@ class AudioEngineTests(unittest.TestCase):
 
         engine = AudioEngine(backend_factory=factory)
 
-        engine.play_ambient("grey", "off", 0.2)
+        played = engine.play_ambient("grey", "off", 0.2)
 
+        self.assertIs(played, True)
         self.assertEqual(2, len(created))
         self.assertEqual(("close",), backends[0].events[-1])
         self.assertEqual(
             [("play_ambient", ("grey",), 0.2)], backends[1].events
         )
+
+    def test_ambient_failure_is_reported_to_the_caller(self):
+        engine = AudioEngine(
+            backend_factory=lambda: RecordingEngineBackend(fail_ambient=True)
+        )
+
+        played = engine.play_ambient("pink", "tone:174", 0.2)
+
+        self.assertIs(played, False)
 
     def test_stop_failure_does_not_escape_and_restores_ambient(self):
         backends = [

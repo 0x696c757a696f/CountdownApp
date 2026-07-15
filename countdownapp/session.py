@@ -167,6 +167,9 @@ class FocusSession:
             return
         if self.state is not SessionState.FOCUSING:
             return
+        if self.reminder_visible:
+            self.reminder_visible = False
+            self._scheduled = None
         now = self._clock()
         if self._last_tick is not None:
             delta = max(0.0, now - self._last_tick)

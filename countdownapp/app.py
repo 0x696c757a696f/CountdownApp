@@ -23,6 +23,7 @@ from .domain import (
     SessionState,
     V2Phase,
     V2Settings,
+    reminder_coverage_warnings,
     validate_settings,
 )
 from .floating import FloatingStatusController, TkFloatingStatusView
@@ -1329,8 +1330,19 @@ class CountdownApp:
     def _ambient_volume(self) -> float:
         return min(1.0, max(0.0, self.ambient_volume_var.get() / 100.0))
 
+    def _play_ambient_selection(
+        self, noise: str, tone: str, volume: float
+    ) -> bool:
+        played = self.audio.play_ambient(noise, tone, volume)
+        if not played and (noise != "off" or tone != "off"):
+            messagebox.showwarning(
+                "背景音播放失败",
+                "无法启动所选背景音。选择已保留，程序会在下次操作时重试；详情请查看 Logs。",
+            )
+        return played
+
     def _preview_ambient(self) -> None:
-        self.audio.play_ambient(
+        self._play_ambient_selection(
             self._current_ambient_value(),
             self._current_solfeggio_value(),
             self._ambient_volume(),
@@ -1340,11 +1352,15 @@ class CountdownApp:
         noise = self._current_ambient_value()
         tone = self._current_solfeggio_value()
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
-        self.audio.play_ambient(noise, tone, volume / 100.0)
+        played = self._play_ambient_selection(noise, tone, volume / 100.0)
         if self.session is not None and self.session.state is SessionState.PAUSED:
             self.audio.pause_ambient()
 
         self._save_runtime_ambient_preferences()
+        if not played:
+            self.runtime_ambient_summary_var.set(
+                "播放失败 · 已保留选择，等待下次重试"
+            )
 
     def _save_runtime_ambient_preferences(self) -> None:
         noise = self._current_ambient_value()
@@ -1463,6 +1479,8 @@ class CountdownApp:
         except ValueError as error:
             self.form_error.config(text=str(error))
             return
+        if not self._confirm_reminder_coverage(settings):
+            return
         self.form_error.config(text="")
         self.app_settings = AppSettings(
             session=settings,
@@ -1494,7 +1512,7 @@ class CountdownApp:
         self.session.start()
         self.floating_status.set_enabled(self.app_settings.floating_status_enabled)
         self.floating_status.begin_session()
-        self.audio.play_ambient(
+        self._play_ambient_selection(
             self.app_settings.ambient_choice,
             self.app_settings.solfeggio_choice,
             self.app_settings.ambient_volume / 100.0,
@@ -1523,6 +1541,17 @@ class CountdownApp:
             settings.reminder_preset.value,
         )
         self._schedule_tick(self.session_generation)
+
+    @staticmethod
+    def _confirm_reminder_coverage(settings: SessionSettings) -> bool:
+        warnings = reminder_coverage_warnings(settings)
+        if not warnings:
+            return True
+        details = "\n".join(f"• {warning}" for warning in warnings)
+        return messagebox.askyesno(
+            "提醒可能过少",
+            f"{details}\n\n仍要按当前设置开始专注吗？",
+        )
 
     def _schedule_tick(self, generation: int) -> None:
         if self.tick_after_id is not None:
@@ -1626,7 +1655,10 @@ class CountdownApp:
             self._update_long_break_display()
             return
         if self.session.state is SessionState.FOCUSING:
+            reminder_was_visible = self.session.reminder_visible
             self.session.pause()
+            if reminder_was_visible:
+                self._close_reminder(dismiss=False)
             self.audio.pause_ambient()
             self.pause_button.config(text="继续专注")
         elif self.session.state is SessionState.PAUSED:

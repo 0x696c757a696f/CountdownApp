@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import platform
 import queue
 import sys
 import time
@@ -12,6 +13,7 @@ from secrets import SystemRandom
 from types import TracebackType
 from tkinter import filedialog, messagebox, ttk
 
+from . import __version__
 from .adaptive import AttentionFeedback
 from .audio import AudioEngine, should_play_return_bell
 from .config import AppSettings, ConfigStore
@@ -115,6 +117,12 @@ class CountdownApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.logger = configure_logging()
+        self.logger.info(
+            "Starting CountdownApp %s with Python %s on %s",
+            __version__,
+            platform.python_version(),
+            platform.platform(),
+        )
         self.store = ConfigStore()
         self.app_settings = self.store.migrate_legacy(
             [install_dir() / "settings.ini", Path.cwd() / "settings.ini"]
@@ -1755,6 +1763,12 @@ class CountdownApp:
             return
         preset = self.session.settings.reminder_preset
         adaptive = self.session.settings.adaptive_reminders_enabled
+        self.logger.info(
+            "Reminder triggered: phase=%s preset=%s adaptive=%s",
+            phase.value if phase is not None else "classic",
+            preset.value,
+            adaptive,
+        )
         if not self.session.settings.break_countdown_enabled:
             if adaptive:
                 self._show_banner("我还在原任务上吗？", 8)
@@ -1873,7 +1887,10 @@ class CountdownApp:
         ).pack(side="left", padx=6)
         window.bind("<Escape>", lambda _event: self._close_reminder())
         window.lift()
-        window.focus_force()
+        if preset is ReminderPreset.STRONG:
+            window.focus_force()
+        else:
+            window.focus_set()
         deadline = time.monotonic() + duration_sec
         overlay_cache = RenderCache()
 

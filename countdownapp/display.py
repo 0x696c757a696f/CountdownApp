@@ -63,5 +63,10 @@ def cover_virtual_desktop(
     window.geometry(f"{bounds.width}x{bounds.height}+0+0")
     window.update_idletasks()
     if sys.platform == "win32" or native_setter is not None:
-        (native_setter or _set_window_position)(window.winfo_id(), bounds)
+        try:
+            (native_setter or _set_window_position)(window.winfo_id(), bounds)
+        except OSError:
+            window.geometry(
+                f"{window.winfo_screenwidth()}x{window.winfo_screenheight()}+0+0"
+            )
     return bounds

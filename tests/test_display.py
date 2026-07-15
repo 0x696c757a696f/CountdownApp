@@ -48,6 +48,18 @@ class DisplayTests(unittest.TestCase):
         self.assertTrue(window.updated)
         self.assertEqual([(42, bounds)], calls)
 
+    def test_native_positioning_failure_keeps_a_primary_screen_fallback(self):
+        window = FakeWindow()
+        bounds = DesktopBounds(-1920, 0, 3840, 1080)
+
+        cover_virtual_desktop(
+            window,
+            bounds=bounds,
+            native_setter=lambda _handle, _area: (_ for _ in ()).throw(OSError()),
+        )
+
+        self.assertEqual("1920x1080+0+0", window.geometry_value)
+
 
 if __name__ == "__main__":
     unittest.main()

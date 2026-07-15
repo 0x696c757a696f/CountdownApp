@@ -10,3 +10,8 @@ dist-staging/
 *.log
 /settings.json
 /Logs/
+.DS_Store
+Thumbs.db
+*.rar
+*.zip
+*.exe

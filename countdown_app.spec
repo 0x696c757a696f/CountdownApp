@@ -62,6 +62,7 @@ exe = EXE(
     upx=True,
     console=False,
     icon=str(root / "clock_icon.ico"),
+    version=str(root / "version_info.txt"),
 )
 
 coll = COLLECT(

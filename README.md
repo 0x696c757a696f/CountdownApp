@@ -101,15 +101,16 @@ python -m venv .venv
 
 ## Windows 打包
 
-当前 spec 生成便于验证的 `onedir` 目录：
+当前 spec 生成免安装的单文件 `onefile` 程序：
 
 ```powershell
 .\build.cmd
 ```
 
-输出位于 `dist\CountdownApp\`，并包含五个内置音频和托盘图标。请只运行
-`dist\CountdownApp\CountdownApp.exe`；`.pyinstaller-build` 是不完整的打包中间目录，不能从中启动程序。
-重新构建会保留该安装目录中已有的 `settings.json` 和 `Logs`。
+输出为 `dist\CountdownApp.exe`，五个内置音频、托盘图标、Python 与第三方依赖均封装在 EXE 中。
+首次运行会在 EXE 同目录自动创建 `settings.json` 和 `Logs`；`.pyinstaller-build` 是不完整的打包中间目录，不能从中启动程序。
+重新构建会保留 `dist` 中已有的 `settings.json` 和 `Logs`。
+单文件启动时会先解压运行组件到系统临时目录，因此首次启动通常比目录版稍慢。
 生成的个人测试构建未做数字签名，Windows 可能显示未知发布者；公开分发前应使用可信代码签名证书签名。
 
 ## 许可证提醒

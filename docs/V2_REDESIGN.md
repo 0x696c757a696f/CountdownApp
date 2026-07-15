@@ -408,7 +408,7 @@ V2Phase = ATTENTION_ANCHOR | DEEP_FOCUS | FATIGUE_SUPPORT
 - Python 3 标准库已经包含的 `configparser` 回移植包；
 - 作为间接依赖或构建依赖混入运行 requirements 的条目。
 
-开发与打包依赖单独维护，包括 `pytest` 和当前支持 Python 3.14 的 PyInstaller。个人验证阶段优先生成 `onedir`、`windowed` 构建，便于检查资源和日志；稳定后再评估单文件构建。
+开发与打包依赖单独维护，包括 `pytest` 和当前支持 Python 3.14 的 PyInstaller。发布构建使用 `onefile`、`windowed` 模式；内置资源从临时解压目录读取，配置与日志始终写在 EXE 所在目录。
 
 PyInstaller 配置必须包含：
 

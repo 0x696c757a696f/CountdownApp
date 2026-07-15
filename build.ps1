@@ -8,15 +8,17 @@ $pyinstaller = Join-Path $projectRoot ".venv\Scripts\pyinstaller.exe"
 $spec = Join-Path $projectRoot "countdown_app.spec"
 $workPath = Join-Path $projectRoot ".pyinstaller-build"
 $distPath = Join-Path $projectRoot "dist"
-$outputExe = Join-Path $distPath "CountdownApp\CountdownApp.exe"
+$outputExe = Join-Path $distPath "CountdownApp.exe"
 $outputDir = Split-Path -Parent $outputExe
+$legacyOutputDir = Join-Path $distPath "CountdownApp"
+$legacyOutputExe = Join-Path $legacyOutputDir "CountdownApp.exe"
 
 if (-not (Test-Path -LiteralPath $pyinstaller -PathType Leaf)) {
     throw "PyInstaller was not found in .venv. Run: .\.venv\Scripts\python -m pip install -r requirements-dev.txt"
 }
 
 $runningApp = Get-CimInstance Win32_Process | Where-Object {
-    $_.ExecutablePath -eq $outputExe
+    $_.ExecutablePath -in @($outputExe, $legacyOutputExe)
 }
 if ($runningApp) {
     $processIds = ($runningApp.ProcessId -join ", ")
@@ -31,10 +33,22 @@ New-Item -ItemType Directory -Path $preserveRoot | Out-Null
 $buildExitCode = 1
 try {
     foreach ($name in $preserveNames) {
-        $source = Join-Path $outputDir $name
-        if (Test-Path -LiteralPath $source) {
-            Copy-Item -LiteralPath $source -Destination $preserveRoot -Recurse -Force
+        foreach ($candidateDir in @($outputDir, $legacyOutputDir)) {
+            $source = Join-Path $candidateDir $name
+            if (Test-Path -LiteralPath $source) {
+                Copy-Item -LiteralPath $source -Destination $preserveRoot -Recurse -Force
+                break
+            }
         }
+    }
+
+    if (Test-Path -LiteralPath $legacyOutputDir) {
+        $resolvedLegacy = [IO.Path]::GetFullPath($legacyOutputDir)
+        $resolvedDist = [IO.Path]::GetFullPath($distPath)
+        if ([IO.Path]::GetDirectoryName($resolvedLegacy) -ne $resolvedDist) {
+            throw "Refusing to remove an unexpected legacy output directory: $resolvedLegacy"
+        }
+        Remove-Item -LiteralPath $resolvedLegacy -Recurse -Force
     }
 
     & $pyinstaller `
@@ -72,4 +86,4 @@ Write-Host ""
 Write-Host "Build complete. Run this executable:" -ForegroundColor Green
 Write-Host $outputExe -ForegroundColor Cyan
 Write-Host ""
-Write-Warning "Do not run executables from .pyinstaller-build; that directory contains incomplete intermediate files."
+Write-Warning "Only distribute dist\CountdownApp.exe. Do not run executables from .pyinstaller-build."

@@ -87,7 +87,7 @@ class RuntimeAmbientTests(unittest.TestCase):
         app.ambient_tasks = AmbientTaskStub(play_result)
         app.store = StoreStub()
         app.app_settings = AppSettings()
-        app.session = SimpleNamespace(state=state)
+        app.focus = SimpleNamespace(state=state)
         app.ambient_var = ValueStub("粉红噪音")
         app.solfeggio_var = ValueStub("Solfeggio 528 Hz")
         app.settings_form = SettingsFormStub(

@@ -3,18 +3,26 @@ from dataclasses import replace
 from unittest.mock import Mock, patch
 
 from countdownapp.app import CountdownApp
-from countdownapp.domain import AlgorithmMode, IntervalRange, SessionSettings, SessionState
+from countdownapp.domain import (
+    AlgorithmMode,
+    IntervalRange,
+    SessionSettings,
+    SessionState,
+)
 
 
-class PausableSessionStub:
+class FocusCoordinatorStub:
     def __init__(self):
         self.state = SessionState.FOCUSING
-        self.reminder_visible = True
-        self.is_long_break = False
 
-    def pause(self):
-        self.reminder_visible = False
+    def toggle_pause(self):
         self.state = SessionState.PAUSED
+        return Mock(
+            paused=True,
+            reminder_was_visible=True,
+            long_break=False,
+            display=Mock(),
+        )
 
 
 class RuntimeControlTests(unittest.TestCase):
@@ -36,17 +44,19 @@ class RuntimeControlTests(unittest.TestCase):
 
     def test_pausing_focus_closes_a_visible_reminder_without_return_bell(self):
         app = CountdownApp.__new__(CountdownApp)
-        app.session = PausableSessionStub()
+        app.focus = FocusCoordinatorStub()
         app.audio = Mock()
         app.runtime_view = Mock()
         app._close_reminder = Mock()
-        app._update_focus_display = Mock()
+        app._render_focus_display = Mock()
 
         app._toggle_pause()
 
         app._close_reminder.assert_called_once_with(dismiss=False)
         app.audio.pause_ambient.assert_called_once_with()
-        app.runtime_view.set_pause_state.assert_called_once_with(paused=True)
+        app.runtime_view.set_pause_state.assert_called_once_with(
+            paused=True, long_break=False
+        )
 
 
 if __name__ == "__main__":

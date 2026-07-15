@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import platform
 import queue
 import sys
@@ -20,7 +19,6 @@ from .audio import AudioEngine, should_play_return_bell
 from .break_prompt_view import BreakPromptBindings, BreakPromptView
 from .config import AppSettings, ConfigStore
 from .domain import (
-    IntervalRange,
     ReminderPreset,
     SessionSettings,
     SessionState,
@@ -28,12 +26,11 @@ from .domain import (
     reminder_coverage_warnings,
 )
 from .floating import FloatingStatusController, TkFloatingStatusView
+from .focus_coordinator import FocusCoordinator
 from .hotkeys import GlobalHotkeyService
 from .logging_config import configure_logging
 from .presentation import (
     format_ambient_summary,
-    format_feedback_summary,
-    format_reminder_status,
     responsive_window_layout,
 )
 from .resources import install_dir, resource_path
@@ -43,7 +40,7 @@ from .reminder_view import (
     ReminderView,
 )
 from .runtime_view import RuntimeBindings, RuntimeDisplay, RuntimeView
-from .session import FocusSession, RuntimeEventKind
+from .session import RuntimeEventKind
 from .settings_form import (
     NOISE_OPTIONS,
     SOLFEGGIO_OPTIONS,
@@ -54,14 +51,6 @@ from .single_instance import SingleInstanceGuard, show_native_message
 from .startup import StartupManager, StartupMode, should_start_hidden
 from .tray import TrayService
 from .v2_settings_dialog import V2SettingsDialog
-
-
-PHASE_NAMES = {
-    None: "Classic",
-    V2Phase.ATTENTION_ANCHOR: "注意力锚定期",
-    V2Phase.DEEP_FOCUS: "深度专注期",
-    V2Phase.FATIGUE_SUPPORT: "疲劳维护期",
-}
 
 
 class CountdownApp:
@@ -99,8 +88,7 @@ class CountdownApp:
         except OSError as error:
             self.logger.warning("Reading Windows startup setting failed: %s", error)
             self.startup_mode = StartupMode.OFF
-        self.session: FocusSession | None = None
-        self.session_generation = 0
+        self.focus = FocusCoordinator(SystemRandom(), time.monotonic)
         self.tick_after_id: str | None = None
         self.tray_after_id: str | None = None
         self.audio_after_id: str | None = None
@@ -510,7 +498,7 @@ class CountdownApp:
     def _runtime_ambient_completed(
         self, noise: str, tone: str, volume: int, played: bool
     ) -> None:
-        if played and self.session is not None and self.session.state is SessionState.PAUSED:
+        if played and self.focus.state is SessionState.PAUSED:
             self.audio.pause_ambient()
         if not played:
             self.runtime_view.set_ambient_summary(
@@ -634,9 +622,10 @@ class CountdownApp:
             self.logger.error("Saving settings failed: %s", error)
             messagebox.showwarning("配置未保存", "本次可以继续运行，但设置未能保存。")
 
-        self.session_generation += 1
-        self.session = FocusSession(settings, SystemRandom(), time.monotonic)
-        self.session.start()
+        generation = self.focus.start(
+            settings,
+            show_next_reminder=self.app_settings.show_next_reminder,
+        )
         self.floating_status.set_enabled(self.app_settings.floating_status_enabled)
         self.floating_status.begin_session()
         self._play_ambient_selection(
@@ -653,14 +642,14 @@ class CountdownApp:
         )
         self.runtime_view.show_focus(ambient_summary)
         self.runtime_view.invalidate()
-        self._update_focus_display()
+        self._render_focus_display(self.focus.display)
         self.logger.info(
             "Focus started: duration=%s mode=%s preset=%s",
             settings.focus_duration_sec,
             settings.algorithm_mode.value,
             settings.reminder_preset.value,
         )
-        self._schedule_tick(self.session_generation)
+        self._schedule_tick(generation)
 
     @staticmethod
     def _confirm_reminder_coverage(settings: SessionSettings) -> bool:
@@ -682,9 +671,10 @@ class CountdownApp:
 
     def _tick(self, generation: int) -> None:
         self.tick_after_id = None
-        if generation != self.session_generation or self.session is None:
+        update = self.focus.tick(generation)
+        if update is None:
             return
-        for event in self.session.tick():
+        for event in update.events:
             if event.kind is RuntimeEventKind.REMINDER_DUE:
                 self._show_reminder(event.phase)
             elif event.kind is RuntimeEventKind.SUSPEND_DETECTED:
@@ -703,85 +693,43 @@ class CountdownApp:
                 messagebox.showinfo("休息结束", "大休息结束，可以开始下一个周期。")
                 self._return_to_settings()
                 return
-        if self.session.is_long_break:
-            self._update_long_break_display()
-        else:
-            self._update_focus_display()
-        if self.session.state not in {SessionState.IDLE, SessionState.BREAK_PROMPT, SessionState.SHUTTING_DOWN}:
+        if update.display is not None:
+            if update.long_break:
+                self.runtime_view.render(update.display)
+            else:
+                self._render_focus_display(update.display)
+        if update.should_continue:
             self._schedule_tick(generation)
 
-    def _update_focus_display(self) -> None:
-        if self.session is None:
-            return
-        timer_text = self._format_seconds(self.session.remaining_sec)
-        phase = self.session.current_phase
-        state_suffix = "（已暂停）" if self.session.state is SessionState.PAUSED else ""
-        phase_text = f"{PHASE_NAMES[phase]}{state_suffix}"
-        interval = self._phase_interval(phase)
-        interval_text = format_reminder_status(
-            interval.minimum_sec,
-            interval.maximum_sec,
-            self.app_settings.show_next_reminder,
-            self.session.next_reminder_remaining_sec,
-            adaptive_enabled=self.session.settings.adaptive_reminders_enabled,
-        )
-        feedback_text = format_feedback_summary(
-            self.session.feedback_summary,
-            self.session.settings.adaptive_reminders_enabled,
-        )
-        self.runtime_view.render(
-            RuntimeDisplay(timer_text, phase_text, interval_text, feedback_text)
-        )
-        self.floating_status.update(timer_text, phase_text)
-
-    def _phase_interval(self, phase: V2Phase | None) -> IntervalRange:
-        assert self.session is not None
-        settings = self.session.settings
-        if phase is None:
-            return settings.classic_interval
-        if phase is V2Phase.ATTENTION_ANCHOR:
-            return settings.v2.anchor_interval
-        if phase is V2Phase.DEEP_FOCUS:
-            return settings.v2.deep_focus_interval
-        return settings.v2.fatigue_interval
-
-    @staticmethod
-    def _format_seconds(seconds: float) -> str:
-        value = max(0, math.ceil(seconds))
-        return f"{value // 60:02d}:{value % 60:02d}"
+    def _render_focus_display(self, display: RuntimeDisplay) -> None:
+        self.runtime_view.render(display)
+        self.floating_status.update(display.timer, display.phase)
 
     def _toggle_pause(self) -> None:
-        if self.session is None:
+        transition = self.focus.toggle_pause()
+        if transition is None:
             return
-        if self.session.is_long_break:
-            if self.session.state is SessionState.LONG_BREAK:
-                self.session.pause()
-                self.runtime_view.set_pause_state(paused=True, long_break=True)
-            elif self.session.state is SessionState.PAUSED:
-                self.session.resume()
-                self.runtime_view.set_pause_state(paused=False, long_break=True)
-            self._update_long_break_display()
+        self.runtime_view.set_pause_state(
+            paused=transition.paused,
+            long_break=transition.long_break,
+        )
+        if transition.long_break:
+            self.runtime_view.render(transition.display)
             return
-        if self.session.state is SessionState.FOCUSING:
-            reminder_was_visible = self.session.reminder_visible
-            self.session.pause()
-            if reminder_was_visible:
+        if transition.paused:
+            if transition.reminder_was_visible:
                 self._close_reminder(dismiss=False)
             self.audio.pause_ambient()
-            self.runtime_view.set_pause_state(paused=True)
-        elif self.session.state is SessionState.PAUSED:
-            self.session.resume()
+        else:
             self.audio.resume_ambient()
-            self.runtime_view.set_pause_state(paused=False)
-        self._update_focus_display()
+        self._render_focus_display(transition.display)
 
     def _stop_focus(self) -> None:
-        if self.session is None:
+        if not self.focus.is_active:
             return
         if not messagebox.askyesno("停止当前周期", "确定停止并返回设置界面吗？"):
             return
         self.logger.info("Session stopped by user")
-        self.session.stop()
         self._return_to_settings()
 
     def _show_break_prompt(self) -> None:
@@ -794,7 +742,7 @@ class CountdownApp:
         self.logger.info("Focus completed; waiting for long-break confirmation")
 
     def _start_long_break(self) -> None:
-        if self.session is None:
+        if self.focus.state is not SessionState.BREAK_PROMPT:
             return
         try:
             duration = SettingsForm.parse_minutes(
@@ -803,34 +751,18 @@ class CountdownApp:
         except ValueError as error:
             messagebox.showerror("输入错误", str(error))
             return
-        self.session.start_long_break(duration)
+        display = self.focus.start_long_break(duration)
         self.break_prompt_view.hide()
         self.runtime_view.show_long_break()
         self.runtime_view.invalidate()
-        self._update_long_break_display()
-        self._schedule_tick(self.session_generation)
-
-    def _update_long_break_display(self) -> None:
-        if self.session is None:
-            return
-        remaining = self.session.long_break_remaining_sec
-        timer_text = self._format_seconds(remaining)
-        phase_text = "大休息（已暂停）" if self.session.state is SessionState.PAUSED else "大休息"
-        self.runtime_view.render(
-            RuntimeDisplay(
-                timer_text,
-                phase_text,
-                "休息期间不会产生随机提醒",
-            )
-        )
+        self.runtime_view.render(display)
+        self._schedule_tick(generation=self.focus.generation)
 
     def _skip_long_break(self) -> None:
-        if self.session is not None:
-            self.session.stop()
         self._return_to_settings()
 
     def _return_to_settings(self) -> None:
-        self.session_generation += 1
+        self.focus.stop()
         if self.tick_after_id is not None:
             self.root.after_cancel(self.tick_after_id)
             self.tick_after_id = None
@@ -845,24 +777,25 @@ class CountdownApp:
         self.root.deiconify()
 
     def _show_reminder(self, phase: V2Phase | None) -> None:
-        if self.session is None:
+        settings = self.focus.settings
+        if settings is None:
             return
-        preset = self.session.settings.reminder_preset
-        adaptive = self.session.settings.adaptive_reminders_enabled
+        preset = settings.reminder_preset
+        adaptive = settings.adaptive_reminders_enabled
         self.logger.info(
             "Reminder triggered: phase=%s preset=%s adaptive=%s",
             phase.value if phase is not None else "classic",
             preset.value,
             adaptive,
         )
-        if not self.session.settings.break_countdown_enabled:
+        if not settings.break_countdown_enabled:
             if adaptive:
                 self._show_banner("我还在原任务上吗？", 8)
                 return
             self.tray.notify("CountdownApp", "微休息提醒：放松视线，确认当前任务。")
             self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
-            self.session.dismiss_reminder()
+            self.focus.dismiss_reminder()
             return
         if phase is V2Phase.DEEP_FOCUS:
             if adaptive:
@@ -872,23 +805,25 @@ class CountdownApp:
             self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
             if notified:
-                self.session.dismiss_reminder()
+                self.focus.dismiss_reminder()
             else:
                 self._show_banner("深度专注：放松视线，确认任务方向。", 5)
             return
         if phase is V2Phase.ATTENTION_ANCHOR:
-            duration = 5 if preset is ReminderPreset.BALANCED else self.session.settings.microbreak_duration_sec
+            duration = (
+                5
+                if preset is ReminderPreset.BALANCED
+                else settings.microbreak_duration_sec
+            )
             if adaptive:
                 duration = max(8, duration)
             self._show_banner("我还在原任务上吗？", duration)
             return
-        self._show_overlay(self.session.settings.microbreak_duration_sec, preset)
+        self._show_overlay(settings.microbreak_duration_sec, preset)
 
     def _show_banner(self, message: str, duration_sec: int) -> None:
-        adaptive = bool(
-            self.session is not None
-            and self.session.settings.adaptive_reminders_enabled
-        )
+        settings = self.focus.settings
+        adaptive = bool(settings and settings.adaptive_reminders_enabled)
         self.reminder_view.show_banner(
             message,
             duration_sec,
@@ -898,10 +833,8 @@ class CountdownApp:
         self.audio.play_bell(self._current_audio_path())
 
     def _show_overlay(self, duration_sec: int, preset: ReminderPreset) -> None:
-        adaptive = bool(
-            self.session is not None
-            and self.session.settings.adaptive_reminders_enabled
-        )
+        settings = self.focus.settings
+        adaptive = bool(settings and settings.adaptive_reminders_enabled)
         self.reminder_view.show_overlay(
             duration_sec,
             preset,
@@ -919,11 +852,11 @@ class CountdownApp:
         )
 
     def _submit_feedback(self, feedback: AttentionFeedback) -> None:
-        if self.session is None or not self.session.record_feedback(feedback):
+        if not self.focus.record_feedback(feedback):
             return
         self.logger.info("Attention feedback recorded: %s", feedback.value)
         self._close_reminder(dismiss=False)
-        self._update_focus_display()
+        self._render_focus_display(self.focus.display)
 
     def _close_reminder(
         self,
@@ -938,11 +871,10 @@ class CountdownApp:
                 pass
             self.audio_after_id = None
         self.audio.stop_bell()
-        if dismiss and self.session is not None:
-            self.session.dismiss_reminder()
-        countdown_enabled = bool(
-            self.session is not None and self.session.settings.break_countdown_enabled
-        )
+        if dismiss:
+            self.focus.dismiss_reminder()
+        settings = self.focus.settings
+        countdown_enabled = bool(settings and settings.break_countdown_enabled)
         if should_play_return_bell(
             countdown_enabled=countdown_enabled,
             completed_automatically=completed_automatically,
@@ -964,17 +896,14 @@ class CountdownApp:
 
     def _minimize_to_tray(self) -> None:
         if self.tray.available:
-            if self.session is None or self.session.state is SessionState.IDLE:
+            if self.focus.state is SessionState.IDLE:
                 self._stop_ambient_playback()
             self.root.withdraw()
         else:
             messagebox.showwarning("托盘不可用", "系统托盘初始化失败，窗口不能隐藏。")
 
     def _on_window_close(self) -> None:
-        active = self.session is not None and self.session.state not in {
-            SessionState.IDLE,
-            SessionState.SHUTTING_DOWN,
-        }
+        active = self.focus.is_active
         if self.close_to_tray_var.get() and self.tray.available:
             self.root.withdraw()
             return
@@ -1007,7 +936,7 @@ class CountdownApp:
                 elif command == "stop":
                     self._stop_focus()
                 elif command == "quit":
-                    if self.session is None or self.session.state is SessionState.IDLE or messagebox.askyesno(
+                    if self.focus.state is SessionState.IDLE or messagebox.askyesno(
                         "退出程序", "当前周期仍在运行，确定退出吗？"
                     ):
                         self._shutdown()
@@ -1021,9 +950,7 @@ class CountdownApp:
 
     def _shutdown(self) -> None:
         self.logger.info("Application shutting down")
-        self.session_generation += 1
-        if self.session is not None:
-            self.session.shutdown()
+        self.focus.shutdown()
         if self.tick_after_id is not None:
             try:
                 self.root.after_cancel(self.tick_after_id)

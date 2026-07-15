@@ -16,10 +16,12 @@
 - **V2 节律编辑器（V2 settings dialog）**：编辑三个 V2 阶段边界与随机区间的单实例窗口；直接绑定设置表单，但不构造会话设置。
 - **设置视图（Settings view）**：管理主设置页布局、滚动、更多设置、算法摘要、快捷键控件与窗口尺寸；业务动作通过回调交给应用层。
 - **大休息确认视图（Break prompt view）**：管理专注自然结束后的休息时长输入、三个用户动作与响应式窗口布局；不解析时长，也不修改会话。
+- **专注会话协调器（Focus coordinator）**：持有当前专注会话，统一代次屏蔽、Tick 结果、暂停转换和运行显示数据；不创建窗口，也不执行音频动作。
 
 ## 关键边界
 
 - `FocusSession` 是会话时间与状态的唯一事实来源。
+- `FocusCoordinator` 是应用访问当前 `FocusSession` 的唯一入口；停止后必须清除旧会话，迟到的 GUI 回调不得恢复旧状态。
 - `ReminderView` 只返回结构化结果；`CountdownApp` 把结果映射为会话反馈和音频动作。
 - `RuntimeView` 不读取 `FocusSession`；`CountdownApp` 将会话状态转换为 `RuntimeDisplay` 后再渲染。
 - `SettingsForm` 是设置页输入的唯一解析与校验入口；界面层不得重复解释分钟、选项标签或自定义音频路径。

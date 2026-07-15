@@ -11,6 +11,14 @@ from .adaptive import FeedbackSummary
 T = TypeVar("T")
 
 
+AMBIENT_NAMES = {
+    "white": "白噪音",
+    "pink": "粉红噪音",
+    "brown": "棕噪音",
+    "grey": "灰噪音",
+}
+
+
 @dataclass(frozen=True)
 class WindowLayout:
     width: int
@@ -39,6 +47,30 @@ def responsive_window_layout(screen_width: int, screen_height: int) -> WindowLay
     )
 
 
+def runtime_window_layout(
+    screen_width: int,
+    screen_height: int,
+    *,
+    controls_expanded: bool,
+    minimum_content_height: int = 0,
+) -> WindowLayout:
+    """Return a compact focus window that grows only for visible audio controls."""
+    preferred_height = 460 if controls_expanded else 280
+    width = min(600, max(1, screen_width - 80))
+    height = min(
+        max(preferred_height, max(0, minimum_content_height)),
+        max(1, screen_height - 100),
+    )
+    return WindowLayout(
+        width=width,
+        height=height,
+        min_width=width,
+        min_height=height,
+        x=max(0, (screen_width - width) // 2),
+        y=max(0, (screen_height - height) // 2),
+    )
+
+
 def scroll_fraction_to_reveal(
     target_y: int, content_height: int, margin: int = 24
 ) -> float:
@@ -46,6 +78,18 @@ def scroll_fraction_to_reveal(
     if content_height <= 0:
         return 0.0
     return min(1.0, max(0.0, (target_y - margin) / content_height))
+
+
+def format_ambient_summary(noise: str, tone: str, volume: int) -> str:
+    layers: list[str] = []
+    if noise != "off":
+        layers.append(AMBIENT_NAMES.get(noise, noise))
+    if tone.startswith("tone:"):
+        layers.append(f"Solfeggio {tone.removeprefix('tone:')} Hz")
+    if not layers:
+        return "已关闭"
+    bounded_volume = min(100, max(0, round(volume)))
+    return f"{' + '.join(layers)} · {bounded_volume}%"
 
 
 def format_feedback_summary(summary: FeedbackSummary, enabled: bool) -> str:

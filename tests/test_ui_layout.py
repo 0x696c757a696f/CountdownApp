@@ -37,6 +37,77 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertFalse(self.app.v2_settings_button.winfo_ismapped())
         self.assertTrue(self.app.more_button.winfo_ismapped())
 
+    def test_runtime_ambient_controls_are_compact_until_requested(self):
+        self.assertEqual("pack", self.app.runtime_ambient_bar.winfo_manager())
+        self.assertEqual("", self.app.runtime_ambient_controls.winfo_manager())
+
+        self.app._toggle_runtime_ambient_controls()
+        self.root.update_idletasks()
+
+        self.assertEqual("pack", self.app.runtime_ambient_controls.winfo_manager())
+        self.assertEqual("收起", self.app.runtime_ambient_toggle_button.cget("text"))
+        self.assertEqual((600, 460), (self.root.winfo_width(), self.root.winfo_height()))
+
+    def test_timer_and_session_details_share_the_dashboard_row(self):
+        self.app.settings_frame.pack_forget()
+        self.app.running_frame.pack(fill="both", expand=True)
+        self.root.update_idletasks()
+
+        timer_y = self.app.timer_label.winfo_rooty()
+        phase_y = self.app.phase_label.winfo_rooty()
+
+        self.assertLess(abs(timer_y - phase_y), 80)
+
+    def test_runtime_actions_use_two_aligned_button_rows(self):
+        self.app.settings_frame.pack_forget()
+        self.app.running_frame.pack(fill="both", expand=True)
+        self.app._toggle_runtime_ambient_controls()
+        self.root.update_idletasks()
+
+        self.assertLessEqual(
+            abs(
+                self.app.runtime_ambient_stop_button.winfo_rooty()
+                - self.app.runtime_ambient_toggle_button.winfo_rooty()
+            ),
+            2,
+        )
+        bottom_buttons = (
+            self.app.pause_button,
+            self.app.stop_focus_button,
+            self.app.hide_to_tray_button,
+        )
+        self.assertEqual(1, len({button.winfo_rooty() for button in bottom_buttons}))
+        self.assertLessEqual(
+            max(button.winfo_width() for button in bottom_buttons)
+            - min(button.winfo_width() for button in bottom_buttons),
+            1,
+        )
+        self.assertGreaterEqual(
+            self.app.runtime_ambient_summary_label.winfo_width(),
+            min(self.app.runtime_ambient_summary_label.winfo_reqwidth(), 260),
+        )
+        self.assertGreaterEqual(
+            self.root.winfo_height(), self.app.running_frame.winfo_reqheight()
+        )
+        button_bottom = (
+            self.app.hide_to_tray_button.winfo_rooty()
+            - self.root.winfo_rooty()
+            + self.app.hide_to_tray_button.winfo_height()
+        )
+        self.assertGreaterEqual(self.root.winfo_height() - button_bottom, 12)
+        self.assertEqual(460, self.root.minsize()[1])
+
+    def test_break_prompt_expands_to_show_every_action(self):
+        self.app.settings_frame.pack_forget()
+        self.app.break_prompt_frame.pack(fill="both", expand=True)
+
+        self.app._apply_break_prompt_window_layout()
+        self.root.update_idletasks()
+
+        self.assertGreaterEqual(
+            self.root.winfo_height(), self.app.break_prompt_frame.winfo_reqheight()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,9 +3,11 @@ import unittest
 from countdownapp.adaptive import FeedbackSummary
 from countdownapp.presentation import (
     RenderCache,
+    format_ambient_summary,
     format_feedback_summary,
     format_reminder_status,
     responsive_window_layout,
+    runtime_window_layout,
     scroll_fraction_to_reveal,
 )
 
@@ -67,6 +69,15 @@ class FeedbackSummaryTests(unittest.TestCase):
         )
 
 
+class AmbientSummaryTests(unittest.TestCase):
+    def test_summarizes_a_runtime_background_audio_mix(self):
+        self.assertEqual(
+            "粉红噪音 + Solfeggio 528 Hz · 20%",
+            format_ambient_summary("pink", "tone:528", 20),
+        )
+        self.assertEqual("已关闭", format_ambient_summary("off", "off", 20))
+
+
 class ResponsiveWindowLayoutTests(unittest.TestCase):
     def test_leaves_vertical_room_around_the_window(self):
         layout = responsive_window_layout(1463, 914)
@@ -85,6 +96,14 @@ class ResponsiveWindowLayoutTests(unittest.TestCase):
     def test_scrolls_an_expanded_section_near_the_top_of_the_viewport(self):
         self.assertAlmostEqual(0.584, scroll_fraction_to_reveal(900, 1500), places=3)
         self.assertEqual(0.0, scroll_fraction_to_reveal(10, 1500))
+
+    def test_running_window_uses_a_compact_height_that_tracks_audio_controls(self):
+        collapsed = runtime_window_layout(1463, 914, controls_expanded=False)
+        expanded = runtime_window_layout(1463, 914, controls_expanded=True)
+
+        self.assertEqual((600, 280), (collapsed.width, collapsed.height))
+        self.assertEqual((600, 460), (expanded.width, expanded.height))
+        self.assertEqual(collapsed.x, expanded.x)
 
 
 if __name__ == "__main__":

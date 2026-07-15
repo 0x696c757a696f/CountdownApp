@@ -15,6 +15,19 @@ class ReleaseMetadataTests(unittest.TestCase):
         self.assertIn("a.binaries,", spec)
         self.assertIn("a.datas,", spec)
 
+    def test_spec_excludes_optional_image_codecs_unused_by_the_tray_icon(self):
+        project_root = Path(__file__).resolve().parents[1]
+        spec = (project_root / "countdown_app.spec").read_text(encoding="utf-8")
+
+        for module in (
+            "PIL._avif",
+            "PIL._webp",
+            "PIL._imagingcms",
+            "PIL._imagingmath",
+            "PIL._imagingtk",
+        ):
+            self.assertIn(f'"{module}"', spec)
+
     def test_package_and_windows_resource_versions_match(self):
         project_root = Path(__file__).resolve().parents[1]
         version_resource = (project_root / "version_info.txt").read_text(

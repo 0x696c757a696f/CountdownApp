@@ -39,6 +39,11 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
+        "PIL._avif",
+        "PIL._imagingcms",
+        "PIL._imagingmath",
+        "PIL._imagingtk",
+        "PIL._webp",
         "playsound",
         "pystray._appindicator",
         "pystray._darwin",

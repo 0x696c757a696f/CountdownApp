@@ -29,7 +29,6 @@ from .domain import (
     reminder_coverage_warnings,
     validate_settings,
 )
-from .display import cover_virtual_desktop
 from .floating import FloatingStatusController, TkFloatingStatusView
 from .hotkeys import GlobalHotkeyService
 from .logging_config import configure_logging
@@ -44,6 +43,12 @@ from .presentation import (
     v2_window_layout,
 )
 from .resources import install_dir, resource_path
+from .reminder_view import (
+    FLOW_FEEDBACK_LABEL,
+    ReminderResult,
+    ReminderResultKind,
+    ReminderView,
+)
 from .session import FocusSession, RuntimeEventKind
 from .single_instance import SingleInstanceGuard, show_native_message
 from .startup import StartupManager, StartupMode, should_start_hidden
@@ -56,8 +61,6 @@ PHASE_NAMES = {
     V2Phase.DEEP_FOCUS: "深度专注期",
     V2Phase.FATIGUE_SUPPORT: "疲劳维护期",
 }
-
-FLOW_FEEDBACK_LABEL = "正在心流，延后下次提醒"
 
 AUDIO_OPTIONS = {
     "提示音 0": "0.wav",
@@ -113,7 +116,6 @@ WINDOW_HOTKEY_PRESETS = (
 class CountdownApp:
     TICK_MS = 500
     TRAY_POLL_MS = 250
-    OVERLAY_TICK_MS = 200
 
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -150,9 +152,8 @@ class CountdownApp:
         self.session_generation = 0
         self.tick_after_id: str | None = None
         self.tray_after_id: str | None = None
-        self.reminder_after_id: str | None = None
         self.audio_after_id: str | None = None
-        self.reminder_window: tk.Toplevel | None = None
+        self.reminder_view = ReminderView(self.root)
         self.render_cache = RenderCache()
 
         self.tray_commands: "queue.Queue[str]" = queue.Queue()
@@ -1841,117 +1842,38 @@ class CountdownApp:
         self._show_overlay(self.session.settings.microbreak_duration_sec, preset)
 
     def _show_banner(self, message: str, duration_sec: int) -> None:
-        self._close_reminder(dismiss=False)
-        window = tk.Toplevel(self.root)
-        self.reminder_window = window
-        window.title("CountdownApp 提醒")
-        window.attributes("-topmost", True)
         adaptive = bool(
             self.session is not None
             and self.session.settings.adaptive_reminders_enabled
         )
-        width, height = 560 if adaptive else 460, 195 if adaptive else 150
-        x = max(0, (window.winfo_screenwidth() - width) // 2)
-        window.geometry(f"{width}x{height}+{x}+40")
-        body = ttk.Frame(window, padding=18)
-        body.pack(fill="both", expand=True)
-        ttk.Label(body, text=message, font=("Microsoft YaHei UI", 16, "bold")).pack(pady=8)
-        actions = ttk.Frame(body)
-        actions.pack(pady=5)
-        if adaptive:
-            ttk.Button(
-                actions,
-                text="仍在任务",
-                command=lambda: self._submit_feedback(AttentionFeedback.ON_TASK),
-            ).pack(side="left", padx=4)
-            ttk.Button(
-                actions,
-                text="刚才走神",
-                command=lambda: self._submit_feedback(AttentionFeedback.DISTRACTED),
-            ).pack(side="left", padx=4)
-            ttk.Button(
-                actions,
-                text=FLOW_FEEDBACK_LABEL,
-                command=lambda: self._submit_feedback(AttentionFeedback.FLOW),
-            ).pack(side="left", padx=4)
-        ttk.Button(actions, text="跳过", command=self._close_reminder).pack(
-            side="left", padx=4
-        )
-        window.bind("<Escape>", lambda _event: self._close_reminder())
-        window.protocol("WM_DELETE_WINDOW", self._close_reminder)
-        self.reminder_after_id = self.root.after(
-            duration_sec * 1000,
-            lambda: self._close_reminder(completed_automatically=True),
+        self.reminder_view.show_banner(
+            message,
+            duration_sec,
+            adaptive,
+            self._handle_reminder_result,
         )
         self.audio.play_bell(self._current_audio_path())
 
     def _show_overlay(self, duration_sec: int, preset: ReminderPreset) -> None:
-        self._close_reminder(dismiss=False)
-        window = tk.Toplevel(self.root)
-        self.reminder_window = window
-        window.overrideredirect(True)
-        window.attributes("-topmost", True)
-        window.configure(bg="black")
-        cover_virtual_desktop(window)
-        if preset is ReminderPreset.BALANCED:
-            window.attributes("-alpha", 0.82)
-        label = tk.Label(
-            window,
-            text="",
-            font=("Microsoft YaHei UI", 86, "bold"),
-            fg="#62d995",
-            bg="black",
-        )
-        label.pack(expand=True)
-        actions = tk.Frame(window, bg="black")
-        actions.pack(pady=30)
         adaptive = bool(
             self.session is not None
             and self.session.settings.adaptive_reminders_enabled
         )
-        if adaptive:
-            for text, feedback in (
-                ("仍在任务", AttentionFeedback.ON_TASK),
-                ("刚才走神", AttentionFeedback.DISTRACTED),
-                (FLOW_FEEDBACK_LABEL, AttentionFeedback.FLOW),
-            ):
-                tk.Button(
-                    actions,
-                    text=text,
-                    command=lambda value=feedback: self._submit_feedback(value),
-                    font=("Microsoft YaHei UI", 14),
-                ).pack(side="left", padx=6)
-        tk.Button(
-            actions,
-            text="跳过（Esc）",
-            command=self._close_reminder,
-            font=("Microsoft YaHei UI", 14),
-        ).pack(side="left", padx=6)
-        window.bind("<Escape>", lambda _event: self._close_reminder())
-        window.lift()
-        if preset is ReminderPreset.STRONG:
-            window.focus_force()
-        else:
-            window.focus_set()
-        deadline = time.monotonic() + duration_sec
-        overlay_cache = RenderCache()
-
-        def update() -> None:
-            if self.reminder_window is not window or not window.winfo_exists():
-                return
-            remaining = max(0, math.ceil(deadline - time.monotonic()))
-            overlay_cache.update(
-                "countdown",
-                f"{remaining} 秒\n放松眼睛和肩膀",
-                lambda value: label.config(text=value),
-            )
-            if time.monotonic() >= deadline:
-                self._close_reminder(completed_automatically=True)
-            else:
-                self.reminder_after_id = self.root.after(self.OVERLAY_TICK_MS, update)
-
-        update()
+        self.reminder_view.show_overlay(
+            duration_sec,
+            preset,
+            adaptive,
+            self._handle_reminder_result,
+        )
         self.audio.play_bell(self._current_audio_path())
+
+    def _handle_reminder_result(self, result: ReminderResult) -> None:
+        if result.kind is ReminderResultKind.FEEDBACK and result.feedback is not None:
+            self._submit_feedback(result.feedback)
+            return
+        self._close_reminder(
+            completed_automatically=result.kind is ReminderResultKind.COMPLETED
+        )
 
     def _submit_feedback(self, feedback: AttentionFeedback) -> None:
         if self.session is None or not self.session.record_feedback(feedback):
@@ -1965,24 +1887,13 @@ class CountdownApp:
         dismiss: bool = True,
         completed_automatically: bool = False,
     ) -> None:
-        if self.reminder_after_id is not None:
-            try:
-                self.root.after_cancel(self.reminder_after_id)
-            except tk.TclError:
-                pass
-            self.reminder_after_id = None
+        self.reminder_view.close()
         if self.audio_after_id is not None:
             try:
                 self.root.after_cancel(self.audio_after_id)
             except tk.TclError:
                 pass
             self.audio_after_id = None
-        window, self.reminder_window = self.reminder_window, None
-        if window is not None:
-            try:
-                window.destroy()
-            except tk.TclError:
-                pass
         self.audio.stop_bell()
         if dismiss and self.session is not None:
             self.session.dismiss_reminder()

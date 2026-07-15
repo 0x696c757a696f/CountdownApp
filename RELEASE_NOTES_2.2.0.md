@@ -67,7 +67,7 @@ Python、Tk、pygame、托盘图标和内置音频均封装在 `CountdownApp.exe
 
 - Python 3.14.6；
 - PyInstaller 6.21.0；
-- 114 项自动测试全部通过；
+- 117 项自动测试全部通过；
 - Windows 打包成功；
 - 打包后的程序已完成启动冒烟测试；
 - EXE 文件版本和产品版本均为 2.2.0；

@@ -71,6 +71,19 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertGreaterEqual(button_top, viewport_top)
         self.assertLessEqual(button_bottom, viewport_bottom)
 
+    def test_adaptive_feedback_setting_explains_buttons_and_effect(self):
+        labels = {
+            widget.cget("text")
+            for widget in self._descendants(self.app.more_frame)
+            if isinstance(widget, (ttk.Label, ttk.Checkbutton))
+        }
+
+        self.assertIn(
+            "在提醒中显示反馈按钮：仍在任务 / 刚才走神 / 心流延后",
+            labels,
+        )
+        self.assertIn("根据反馈自动调整下一次提醒间隔", labels)
+
     def test_v2_editor_groups_boundaries_and_interval_columns_compactly(self):
         self.app._open_v2_settings()
         self.root.update_idletasks()

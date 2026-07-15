@@ -465,13 +465,18 @@ class CountdownApp:
         ).grid(row=0, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         ttk.Checkbutton(
             reminder_section,
-            text="根据反馈自适应下一次间隔",
+            text="在提醒中显示反馈按钮：仍在任务 / 刚才走神 / 心流延后",
             variable=self.adaptive_var,
             style="Form.TCheckbutton",
         ).grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
+        ttk.Label(
+            reminder_section,
+            text="根据反馈自动调整下一次提醒间隔",
+            style="FormHint.TLabel",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", padx=(20, 0), pady=(0, 4))
 
         ttk.Label(reminder_section, text="微休息开始铃", style="Form.TLabel").grid(
-            row=2, column=0, sticky="e", pady=4
+            row=3, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
             reminder_section,
@@ -479,16 +484,16 @@ class CountdownApp:
             values=tuple(AUDIO_OPTIONS),
             state="readonly",
             width=18,
-        ).grid(row=2, column=1, sticky="ew", padx=(12, 8), pady=4)
+        ).grid(row=3, column=1, sticky="ew", padx=(12, 8), pady=4)
         ttk.Button(
             reminder_section, text="试听", command=lambda: self._test_audio(False)
-        ).grid(row=2, column=2, padx=4)
+        ).grid(row=3, column=2, padx=4)
         ttk.Button(
             reminder_section, text="选择文件", command=lambda: self._choose_audio(False)
-        ).grid(row=2, column=3)
+        ).grid(row=3, column=3)
 
         ttk.Label(reminder_section, text="回归专注铃", style="Form.TLabel").grid(
-            row=3, column=0, sticky="e", pady=4
+            row=4, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
             reminder_section,
@@ -496,13 +501,13 @@ class CountdownApp:
             values=tuple(AUDIO_OPTIONS),
             state="readonly",
             width=18,
-        ).grid(row=3, column=1, sticky="ew", padx=(12, 8), pady=4)
+        ).grid(row=4, column=1, sticky="ew", padx=(12, 8), pady=4)
         ttk.Button(
             reminder_section, text="试听", command=lambda: self._test_audio(True)
-        ).grid(row=3, column=2, padx=4)
+        ).grid(row=4, column=2, padx=4)
         ttk.Button(
             reminder_section, text="选择文件", command=lambda: self._choose_audio(True)
-        ).grid(row=3, column=3)
+        ).grid(row=4, column=3)
 
         ambient_section = ttk.LabelFrame(
             self.more_frame,

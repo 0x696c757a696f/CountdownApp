@@ -39,6 +39,7 @@ PHASE_NAMES = {
 }
 
 AUDIO_OPTIONS = {
+    "提示音 0": "0.wav",
     "提示音 1": "1.wav",
     "提示音 2": "2.wav",
     "提示音 3": "3.wav",
@@ -565,13 +566,13 @@ class CountdownApp:
         self.long_break_var.set(self._number(session.long_break_duration_sec / 60))
         selected_name = next(
             (name for name, value in AUDIO_OPTIONS.items() if value == settings.audio_choice),
-            "提示音 1",
+            "提示音 0",
         )
         self.audio_var.set(selected_name)
         self.custom_audio_path = settings.custom_audio_path
         return_selected_name = next(
             (name for name, value in AUDIO_OPTIONS.items() if value == settings.return_audio_choice),
-            "提示音 3",
+            "提示音 1",
         )
         self.return_audio_var.set(return_selected_name)
         self.return_custom_audio_path = settings.return_custom_audio_path
@@ -834,14 +835,14 @@ class CountdownApp:
         return number
 
     def _current_audio_value(self) -> str:
-        return AUDIO_OPTIONS.get(self.audio_var.get(), "1.wav")
+        return AUDIO_OPTIONS.get(self.audio_var.get(), "0.wav")
 
     def _current_audio_path(self) -> Path:
         value = self._current_audio_value()
         return Path(self.custom_audio_path) if value == "custom" else resource_path(value)
 
     def _current_return_audio_value(self) -> str:
-        return AUDIO_OPTIONS.get(self.return_audio_var.get(), "3.wav")
+        return AUDIO_OPTIONS.get(self.return_audio_var.get(), "1.wav")
 
     def _current_return_audio_path(self) -> Path:
         value = self._current_return_audio_value()

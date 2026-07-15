@@ -23,9 +23,9 @@ SCHEMA_VERSION = 2
 @dataclass(frozen=True)
 class AppSettings:
     session: SessionSettings = field(default_factory=SessionSettings.defaults)
-    audio_choice: str = "1.wav"
+    audio_choice: str = "0.wav"
     custom_audio_path: str = ""
-    return_audio_choice: str = "3.wav"
+    return_audio_choice: str = "1.wav"
     return_custom_audio_path: str = ""
     ambient_choice: str = "off"
     solfeggio_choice: str = "off"
@@ -88,7 +88,7 @@ class ConfigStore:
             if custom_audio_path:
                 break
         settings = AppSettings(
-            audio_choice="custom" if custom_audio_path else "1.wav",
+            audio_choice="custom" if custom_audio_path else "0.wav",
             custom_audio_path=custom_audio_path,
             migration_completed=True,
         )
@@ -182,9 +182,9 @@ class ConfigStore:
             ambient_choice = "off"
         return AppSettings(
             session=session,
-            audio_choice=str(audio.get("choice", "1.wav")),
+            audio_choice=str(audio.get("choice", "0.wav")),
             custom_audio_path=str(audio.get("custom_path", "")),
-            return_audio_choice=str(audio.get("return_choice", "3.wav")),
+            return_audio_choice=str(audio.get("return_choice", "1.wav")),
             return_custom_audio_path=str(audio.get("return_custom_path", "")),
             ambient_choice=ambient_choice,
             solfeggio_choice=solfeggio_choice,

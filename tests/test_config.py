@@ -8,6 +8,12 @@ from countdownapp.domain import AlgorithmMode, ReminderPreset, SessionSettings
 
 
 class ConfigStoreTests(unittest.TestCase):
+    def test_new_install_uses_the_requested_default_bells(self):
+        settings = AppSettings()
+
+        self.assertEqual("0.wav", settings.audio_choice)
+        self.assertEqual("1.wav", settings.return_audio_choice)
+
     def test_round_trips_complete_session_and_audio_settings(self):
         with tempfile.TemporaryDirectory() as directory:
             store = ConfigStore(Path(directory) / "settings.json")
@@ -42,7 +48,7 @@ class ConfigStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.json"
             store = ConfigStore(path)
-            store.save(AppSettings(audio_choice="1.wav"))
+            store.save(AppSettings(audio_choice="2.wav"))
             data = json.loads(path.read_text(encoding="utf-8"))
             data["audio"].pop("return_choice")
             data["audio"].pop("return_custom_path")
@@ -54,8 +60,8 @@ class ConfigStoreTests(unittest.TestCase):
 
             self.assertTrue(loaded.session.break_countdown_enabled)
             self.assertTrue(loaded.close_to_tray)
-            self.assertEqual("1.wav", loaded.audio_choice)
-            self.assertEqual("3.wav", loaded.return_audio_choice)
+            self.assertEqual("2.wav", loaded.audio_choice)
+            self.assertEqual("1.wav", loaded.return_audio_choice)
             self.assertEqual("off", loaded.ambient_choice)
             self.assertEqual("off", loaded.solfeggio_choice)
             self.assertEqual(20, loaded.ambient_volume)

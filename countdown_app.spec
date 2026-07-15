@@ -5,6 +5,7 @@ from pathlib import Path
 
 root = Path(SPECPATH)
 assets = [
+    (str(root / "0.wav"), "."),
     (str(root / "1.wav"), "."),
     (str(root / "2.wav"), "."),
     (str(root / "3.wav"), "."),

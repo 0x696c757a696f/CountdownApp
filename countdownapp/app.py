@@ -406,14 +406,16 @@ class CountdownApp:
             form,
             textvariable=self.v2_summary_var,
             style="FormHint.TLabel",
-            wraplength=430,
+            wraplength=340,
             justify="left",
         )
         self.v2_summary_label.grid(row=10, column=0, columnspan=2, sticky="w", pady=5)
+        settings_actions = ttk.Frame(form, style="Form.TFrame")
+        settings_actions.grid(row=10, column=2, sticky="e", pady=5)
         self.v2_settings_button = ttk.Button(
-            form, text="调整 V2", command=self._open_v2_settings
+            settings_actions, text="调整 V2", command=self._open_v2_settings
         )
-        self.v2_settings_button.grid(row=10, column=2, sticky="e", pady=5)
+        self.v2_settings_button.grid(row=0, column=0, padx=(0, 6))
         for variable in (
             self.anchor_min_var,
             self.anchor_max_var,
@@ -426,9 +428,9 @@ class CountdownApp:
 
         self.more_visible = False
         self.more_button = ttk.Button(
-            form, text="更多设置 ▾", command=self._toggle_more_settings
+            settings_actions, text="更多设置 ▾", command=self._toggle_more_settings
         )
-        self.more_button.grid(row=11, column=0, columnspan=3, pady=(8, 2))
+        self.more_button.grid(row=0, column=1)
         self.more_frame = ttk.Frame(form, padding=(0, 8, 0, 0), style="Form.TFrame")
         self.more_frame.columnconfigure(0, weight=1)
 
@@ -826,7 +828,7 @@ class CountdownApp:
     def _toggle_more_settings(self) -> None:
         self.more_visible = not self.more_visible
         if self.more_visible:
-            self.more_frame.grid(row=12, column=0, columnspan=3, sticky="ew")
+            self.more_frame.grid(row=11, column=0, columnspan=3, sticky="ew")
             self.more_button.config(text="收起更多设置 ▴")
             self.root.after_idle(self._reveal_more_settings)
         else:

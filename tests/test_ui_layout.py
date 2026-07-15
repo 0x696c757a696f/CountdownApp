@@ -1,6 +1,7 @@
 import tkinter as tk
 import unittest
 from types import SimpleNamespace
+from tkinter import ttk
 
 from countdownapp.app import CountdownApp
 
@@ -17,17 +18,36 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.app._configure_root()
         self.root.geometry("+10000+10000")
         self.app._build_ui()
-        self.root.update_idletasks()
+        self.root.update()
 
     def tearDown(self):
         if hasattr(self, "root"):
             self.root.destroy()
+
+    @staticmethod
+    def _descendants(widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from SettingsActionLayoutTests._descendants(child)
 
     def test_v2_and_more_settings_actions_share_one_horizontal_row(self):
         v2_y = self.app.v2_settings_button.winfo_rooty()
         more_y = self.app.more_button.winfo_rooty()
 
         self.assertLessEqual(abs(v2_y - more_y), 2)
+
+    def test_primary_settings_actions_are_fully_visible_without_scrolling(self):
+        self.root.geometry("720x690+80+80")
+        self.root.update()
+        viewport_bottom = (
+            self.app.basic_canvas.winfo_rooty()
+            + self.app.basic_canvas.winfo_height()
+        )
+        action_bottom = (
+            self.app.more_button.winfo_rooty() + self.app.more_button.winfo_height()
+        )
+
+        self.assertLessEqual(action_bottom, viewport_bottom)
 
     def test_more_settings_action_remains_visible_in_classic_mode(self):
         self.app.algorithm_var.set("Classic")
@@ -36,6 +56,43 @@ class SettingsActionLayoutTests(unittest.TestCase):
 
         self.assertFalse(self.app.v2_settings_button.winfo_ismapped())
         self.assertTrue(self.app.more_button.winfo_ismapped())
+
+    def test_expanding_more_settings_keeps_the_collapse_action_visible(self):
+        self.root.geometry("720x690+80+80")
+        self.root.update()
+
+        self.app._toggle_more_settings()
+        self.root.update()
+
+        viewport_top = self.app.basic_canvas.winfo_rooty()
+        viewport_bottom = viewport_top + self.app.basic_canvas.winfo_height()
+        button_top = self.app.more_button.winfo_rooty()
+        button_bottom = button_top + self.app.more_button.winfo_height()
+        self.assertGreaterEqual(button_top, viewport_top)
+        self.assertLessEqual(button_bottom, viewport_bottom)
+
+    def test_v2_editor_groups_boundaries_and_interval_columns_compactly(self):
+        self.app._open_v2_settings()
+        self.root.update_idletasks()
+        window = self.app.v2_window
+        descendants = tuple(self._descendants(window))
+
+        sections = {
+            widget.cget("text")
+            for widget in descendants
+            if isinstance(widget, ttk.LabelFrame)
+        }
+        labels = {
+            widget.cget("text")
+            for widget in descendants
+            if isinstance(widget, ttk.Label)
+        }
+
+        self.assertEqual({"阶段边界", "阶段随机间隔（分钟）"}, sections)
+        self.assertTrue({"阶段", "最小", "最大"}.issubset(labels))
+        self.assertEqual((560, 430), (window.winfo_width(), window.winfo_height()))
+        body = window.winfo_children()[0]
+        self.assertGreaterEqual(window.winfo_height(), body.winfo_reqheight())
 
     def test_runtime_ambient_controls_are_compact_until_requested(self):
         self.assertEqual("pack", self.app.runtime_ambient_bar.winfo_manager())

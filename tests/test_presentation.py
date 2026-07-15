@@ -9,6 +9,7 @@ from countdownapp.presentation import (
     responsive_window_layout,
     runtime_window_layout,
     scroll_fraction_to_reveal,
+    v2_window_layout,
 )
 
 
@@ -82,8 +83,8 @@ class ResponsiveWindowLayoutTests(unittest.TestCase):
     def test_leaves_vertical_room_around_the_window(self):
         layout = responsive_window_layout(1463, 914)
 
-        self.assertEqual((760, 720), (layout.width, layout.height))
-        self.assertEqual((351, 97), (layout.x, layout.y))
+        self.assertEqual((720, 690), (layout.width, layout.height))
+        self.assertEqual((371, 112), (layout.x, layout.y))
         self.assertLessEqual(layout.height, 914 - 140)
 
     def test_shrinks_for_a_small_display_instead_of_clipping(self):
@@ -104,6 +105,13 @@ class ResponsiveWindowLayoutTests(unittest.TestCase):
         self.assertEqual((600, 280), (collapsed.width, collapsed.height))
         self.assertEqual((600, 460), (expanded.width, expanded.height))
         self.assertEqual(collapsed.x, expanded.x)
+
+    def test_v2_dialog_is_compact_and_centered(self):
+        layout = v2_window_layout(1463, 914)
+
+        self.assertEqual((560, 430), (layout.width, layout.height))
+        self.assertEqual((451, 242), (layout.x, layout.y))
+        self.assertEqual((540, 410), (layout.min_width, layout.min_height))
 
 
 if __name__ == "__main__":

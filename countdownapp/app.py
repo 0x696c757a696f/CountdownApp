@@ -35,6 +35,7 @@ from .presentation import (
     responsive_window_layout,
     runtime_window_layout,
     scroll_fraction_to_reveal,
+    v2_window_layout,
 )
 from .resources import install_dir, resource_path
 from .session import FocusSession, RuntimeEventKind
@@ -988,7 +989,9 @@ class CountdownApp:
         bounds = self.basic_canvas.bbox("all")
         if bounds is None:
             return
-        target_y = self.more_frame.winfo_rooty() - self.basic_content.winfo_rooty()
+        # Keep the collapse action in view so expanding the section never
+        # strands the user below a partially clipped button row.
+        target_y = self.more_button.winfo_rooty() - self.basic_content.winfo_rooty()
         content_height = bounds[3] - bounds[1]
         self.basic_canvas.yview_moveto(
             scroll_fraction_to_reveal(target_y, content_height)
@@ -1113,51 +1116,86 @@ class CountdownApp:
         window = tk.Toplevel(self.root)
         self.v2_window = window
         window.title("V2 节律设置")
-        window.geometry("580x500")
-        window.minsize(540, 460)
+        layout = v2_window_layout(window.winfo_screenwidth(), window.winfo_screenheight())
+        window.geometry(layout.geometry)
+        window.minsize(layout.min_width, layout.min_height)
         window.transient(self.root)
-        body = ttk.Frame(window, padding=24, style="App.TFrame")
+        body = ttk.Frame(window, padding=(16, 12), style="App.TFrame")
         body.pack(fill="both", expand=True)
-        body.columnconfigure(1, weight=1)
+        body.columnconfigure(0, weight=1)
 
-        ttk.Label(body, text="V2 节律设置", style="Title.TLabel").grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, 4)
+        ttk.Label(body, text="V2 节律设置", style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 2)
         )
         ttk.Label(
             body,
             text="主页面的最小/最大间隔对应注意力锚定期。这里可以调整全部阶段。",
             style="Subtitle.TLabel",
-            wraplength=500,
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 16))
+            wraplength=510,
+        ).grid(row=1, column=0, sticky="w", pady=(0, 6))
 
-        rows = (
-            ("锚定期结束（分钟）", self.anchor_end_var),
-            ("疲劳期开始（分钟）", self.fatigue_start_var),
-            ("锚定期间隔（分钟）", (self.anchor_min_var, self.anchor_max_var)),
-            ("深度期间隔（分钟）", (self.deep_min_var, self.deep_max_var)),
-            ("疲劳期间隔（分钟）", (self.fatigue_min_var, self.fatigue_max_var)),
+        boundaries = ttk.LabelFrame(
+            body, text="阶段边界", padding=(10, 4), style="Settings.TLabelframe"
         )
-        for row, (label, variables) in enumerate(rows, start=2):
-            ttk.Label(body, text=label).grid(row=row, column=0, sticky="e", pady=7)
-            if isinstance(variables, tuple):
-                interval_box = ttk.Frame(body, style="App.TFrame")
-                interval_box.grid(row=row, column=1, sticky="w", padx=(12, 0))
-                ttk.Entry(interval_box, textvariable=variables[0], width=10).pack(side="left")
-                ttk.Label(interval_box, text="—").pack(side="left", padx=7)
-                ttk.Entry(interval_box, textvariable=variables[1], width=10).pack(side="left")
-            else:
-                ttk.Entry(body, textvariable=variables, width=22).grid(
-                    row=row, column=1, sticky="ew", padx=(12, 0), pady=7
-                )
+        boundaries.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        boundaries.columnconfigure(1, weight=1)
+        for row, (label, variable) in enumerate(
+            (
+                ("锚定期结束", self.anchor_end_var),
+                ("疲劳期开始", self.fatigue_start_var),
+            )
+        ):
+            ttk.Label(boundaries, text=label).grid(
+                row=row, column=0, sticky="w", padx=(0, 12), pady=1
+            )
+            ttk.Entry(boundaries, textvariable=variable, width=12).grid(
+                row=row, column=1, sticky="ew", pady=1
+            )
+            ttk.Label(boundaries, text="分钟").grid(
+                row=row, column=2, sticky="w", padx=(8, 0), pady=1
+            )
+
+        intervals = ttk.LabelFrame(
+            body,
+            text="阶段随机间隔（分钟）",
+            padding=(10, 4),
+            style="Settings.TLabelframe",
+        )
+        intervals.grid(row=3, column=0, sticky="ew")
+        intervals.columnconfigure((1, 2), weight=1)
+        ttk.Label(intervals, text="阶段", style="Section.TLabel").grid(
+            row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 1)
+        )
+        ttk.Label(intervals, text="最小", style="Section.TLabel").grid(
+            row=0, column=1, sticky="w", pady=(0, 1)
+        )
+        ttk.Label(intervals, text="最大", style="Section.TLabel").grid(
+            row=0, column=2, sticky="w", padx=(8, 0), pady=(0, 1)
+        )
+        interval_rows = (
+            ("锚定期", self.anchor_min_var, self.anchor_max_var),
+            ("深度期", self.deep_min_var, self.deep_max_var),
+            ("疲劳期", self.fatigue_min_var, self.fatigue_max_var),
+        )
+        for row, (label, minimum, maximum) in enumerate(interval_rows, start=1):
+            ttk.Label(intervals, text=label).grid(
+                row=row, column=0, sticky="w", padx=(0, 12), pady=1
+            )
+            ttk.Entry(intervals, textvariable=minimum, width=10).grid(
+                row=row, column=1, sticky="ew", pady=1
+            )
+            ttk.Entry(intervals, textvariable=maximum, width=10).grid(
+                row=row, column=2, sticky="ew", padx=(8, 0), pady=1
+            )
 
         actions = ttk.Frame(body, style="App.TFrame")
-        actions.grid(row=7, column=0, columnspan=2, pady=(20, 0))
+        actions.grid(row=4, column=0, sticky="e", pady=(8, 0))
         ttk.Button(
             actions, text="恢复默认节律", command=self._reset_v2_defaults
-        ).pack(side="left", padx=5)
+        ).pack(side="left", padx=(0, 8))
         ttk.Button(
             actions, text="完成", style="Primary.TButton", command=self._close_v2_settings
-        ).pack(side="left", padx=5)
+        ).pack(side="left")
         window.protocol("WM_DELETE_WINDOW", self._close_v2_settings)
 
     def _close_v2_settings(self) -> None:

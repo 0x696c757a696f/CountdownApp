@@ -35,13 +35,27 @@ class WindowLayout:
 
 def responsive_window_layout(screen_width: int, screen_height: int) -> WindowLayout:
     """Size and center the settings window without crowding the display edges."""
-    width = min(760, max(1, screen_width - 80))
-    height = min(720, max(1, screen_height - 140))
+    width = min(720, max(1, screen_width - 80))
+    height = min(690, max(1, screen_height - 140))
     return WindowLayout(
         width=width,
         height=height,
         min_width=min(640, width),
         min_height=min(540, height),
+        x=max(0, (screen_width - width) // 2),
+        y=max(0, (screen_height - height) // 2),
+    )
+
+
+def v2_window_layout(screen_width: int, screen_height: int) -> WindowLayout:
+    """Size the V2 editor around its two compact settings groups."""
+    width = min(560, max(1, screen_width - 80))
+    height = min(430, max(1, screen_height - 100))
+    return WindowLayout(
+        width=width,
+        height=height,
+        min_width=min(540, width),
+        min_height=min(410, height),
         x=max(0, (screen_width - width) // 2),
         y=max(0, (screen_height - height) // 2),
     )

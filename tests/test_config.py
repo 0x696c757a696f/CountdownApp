@@ -38,6 +38,8 @@ class ConfigStoreTests(unittest.TestCase):
                 ambient_volume=23,
                 close_to_tray=False,
                 show_next_reminder=True,
+                global_hotkeys_enabled=True,
+                floating_status_enabled=True,
             )
 
             store.save(expected)

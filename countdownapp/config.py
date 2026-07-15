@@ -32,6 +32,8 @@ class AppSettings:
     ambient_volume: int = 20
     close_to_tray: bool = True
     show_next_reminder: bool = False
+    global_hotkeys_enabled: bool = False
+    floating_status_enabled: bool = False
     migration_completed: bool = False
     schema_version: int = SCHEMA_VERSION
 
@@ -115,6 +117,8 @@ class ConfigStore:
             "behavior": {
                 "close_to_tray": settings.close_to_tray,
                 "show_next_reminder": settings.show_next_reminder,
+                "global_hotkeys_enabled": settings.global_hotkeys_enabled,
+                "floating_status_enabled": settings.floating_status_enabled,
             },
             "ambient": {
                 "choice": settings.ambient_choice,
@@ -197,6 +201,12 @@ class ConfigStore:
             ambient_volume=max(0, min(100, int(ambient.get("volume", 20)))),
             close_to_tray=bool(behavior.get("close_to_tray", True)),
             show_next_reminder=bool(behavior.get("show_next_reminder", False)),
+            global_hotkeys_enabled=bool(
+                behavior.get("global_hotkeys_enabled", False)
+            ),
+            floating_status_enabled=bool(
+                behavior.get("floating_status_enabled", False)
+            ),
             migration_completed=bool(data.get("migration_completed", False)),
             schema_version=SCHEMA_VERSION,
         )

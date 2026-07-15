@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 import math
 from typing import TypeVar
 
@@ -8,6 +9,43 @@ from .adaptive import FeedbackSummary
 
 
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class WindowLayout:
+    width: int
+    height: int
+    min_width: int
+    min_height: int
+    x: int
+    y: int
+
+    @property
+    def geometry(self) -> str:
+        return f"{self.width}x{self.height}+{self.x}+{self.y}"
+
+
+def responsive_window_layout(screen_width: int, screen_height: int) -> WindowLayout:
+    """Size and center the settings window without crowding the display edges."""
+    width = min(760, max(1, screen_width - 80))
+    height = min(720, max(1, screen_height - 140))
+    return WindowLayout(
+        width=width,
+        height=height,
+        min_width=min(640, width),
+        min_height=min(540, height),
+        x=max(0, (screen_width - width) // 2),
+        y=max(0, (screen_height - height) // 2),
+    )
+
+
+def scroll_fraction_to_reveal(
+    target_y: int, content_height: int, margin: int = 24
+) -> float:
+    """Return a bounded canvas position that reveals an expanded section."""
+    if content_height <= 0:
+        return 0.0
+    return min(1.0, max(0.0, (target_y - margin) / content_height))
 
 
 def format_feedback_summary(summary: FeedbackSummary, enabled: bool) -> str:

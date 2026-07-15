@@ -5,6 +5,8 @@ from countdownapp.presentation import (
     RenderCache,
     format_feedback_summary,
     format_reminder_status,
+    responsive_window_layout,
+    scroll_fraction_to_reveal,
 )
 
 
@@ -63,6 +65,26 @@ class FeedbackSummaryTests(unittest.TestCase):
             "本轮反馈：仍在任务 3 · 走神 2 · 心流延后 1",
             format_feedback_summary(summary, True),
         )
+
+
+class ResponsiveWindowLayoutTests(unittest.TestCase):
+    def test_leaves_vertical_room_around_the_window(self):
+        layout = responsive_window_layout(1463, 914)
+
+        self.assertEqual((760, 720), (layout.width, layout.height))
+        self.assertEqual((351, 97), (layout.x, layout.y))
+        self.assertLessEqual(layout.height, 914 - 140)
+
+    def test_shrinks_for_a_small_display_instead_of_clipping(self):
+        layout = responsive_window_layout(800, 600)
+
+        self.assertEqual((720, 460), (layout.width, layout.height))
+        self.assertEqual((640, 460), (layout.min_width, layout.min_height))
+        self.assertEqual("720x460+40+70", layout.geometry)
+
+    def test_scrolls_an_expanded_section_near_the_top_of_the_viewport(self):
+        self.assertAlmostEqual(0.584, scroll_fraction_to_reveal(900, 1500), places=3)
+        self.assertEqual(0.0, scroll_fraction_to_reveal(10, 1500))
 
 
 if __name__ == "__main__":

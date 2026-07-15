@@ -31,6 +31,8 @@ from .presentation import (
     RenderCache,
     format_feedback_summary,
     format_reminder_status,
+    responsive_window_layout,
+    scroll_fraction_to_reveal,
 )
 from .resources import install_dir, resource_path
 from .session import FocusSession, RuntimeEventKind
@@ -179,8 +181,11 @@ class CountdownApp:
 
     def _configure_root(self) -> None:
         self.root.title("CountdownApp V2")
-        self.root.geometry("760x760")
-        self.root.minsize(700, 620)
+        window_layout = responsive_window_layout(
+            self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        )
+        self.root.geometry(window_layout.geometry)
+        self.root.minsize(window_layout.min_width, window_layout.min_height)
         self.root.configure(bg="#f4f7fb")
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
         style = ttk.Style(self.root)
@@ -210,6 +215,19 @@ class CountdownApp:
             background=card,
             foreground=text,
             font=("Microsoft YaHei UI", 10),
+        )
+        style.configure(
+            "Settings.TLabelframe",
+            background=card,
+            bordercolor="#dbe3ef",
+            borderwidth=1,
+            relief="solid",
+        )
+        style.configure(
+            "Settings.TLabelframe.Label",
+            background=card,
+            foreground=text,
+            font=("Microsoft YaHei UI", 10, "bold"),
         )
         style.configure(
             "Title.TLabel", background=background, foreground=text,
@@ -309,6 +327,7 @@ class CountdownApp:
         basic_content = ttk.Frame(
             self.basic_canvas, padding=(12, 14), style="App.TFrame"
         )
+        self.basic_content = basic_content
         basic_content.columnconfigure(0, weight=1)
         basic_window = self.basic_canvas.create_window(
             (0, 0), window=basic_content, anchor="nw"
@@ -411,171 +430,195 @@ class CountdownApp:
         )
         self.more_button.grid(row=11, column=0, columnspan=3, pady=(8, 2))
         self.more_frame = ttk.Frame(form, padding=(0, 8, 0, 0), style="Form.TFrame")
-        self.more_frame.columnconfigure(1, weight=1)
+        self.more_frame.columnconfigure(0, weight=1)
 
-        ttk.Label(self.more_frame, text="提醒强度", style="Form.TLabel").grid(
+        reminder_section = ttk.LabelFrame(
+            self.more_frame,
+            text="提醒与铃声",
+            padding=12,
+            style="Settings.TLabelframe",
+        )
+        reminder_section.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        reminder_section.columnconfigure(1, weight=1)
+
+        ttk.Label(reminder_section, text="提醒强度", style="Form.TLabel").grid(
             row=0, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
-            self.more_frame,
+            reminder_section,
             textvariable=self.preset_var,
             values=("平衡", "强干预"),
             state="readonly",
             width=18,
-        ).grid(row=0, column=1, sticky="ew", padx=(12, 8), pady=4)
+        ).grid(row=0, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         ttk.Checkbutton(
-            self.more_frame,
+            reminder_section,
             text="根据反馈自适应下一次间隔",
             variable=self.adaptive_var,
             style="Form.TCheckbutton",
-        ).grid(row=0, column=2, columnspan=2, sticky="w", pady=4)
+        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
 
-        ttk.Label(self.more_frame, text="微休息开始铃", style="Form.TLabel").grid(
-            row=1, column=0, sticky="e", pady=4
-        )
-        ttk.Combobox(
-            self.more_frame,
-            textvariable=self.audio_var,
-            values=tuple(AUDIO_OPTIONS),
-            state="readonly",
-            width=18,
-        ).grid(row=1, column=1, sticky="ew", padx=(12, 8), pady=4)
-        ttk.Button(
-            self.more_frame, text="试听", command=lambda: self._test_audio(False)
-        ).grid(row=1, column=2, padx=4)
-        ttk.Button(
-            self.more_frame, text="选择文件", command=lambda: self._choose_audio(False)
-        ).grid(row=1, column=3)
-
-        ttk.Label(self.more_frame, text="回归专注铃", style="Form.TLabel").grid(
+        ttk.Label(reminder_section, text="微休息开始铃", style="Form.TLabel").grid(
             row=2, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
-            self.more_frame,
-            textvariable=self.return_audio_var,
+            reminder_section,
+            textvariable=self.audio_var,
             values=tuple(AUDIO_OPTIONS),
             state="readonly",
             width=18,
         ).grid(row=2, column=1, sticky="ew", padx=(12, 8), pady=4)
         ttk.Button(
-            self.more_frame, text="试听", command=lambda: self._test_audio(True)
+            reminder_section, text="试听", command=lambda: self._test_audio(False)
         ).grid(row=2, column=2, padx=4)
         ttk.Button(
-            self.more_frame, text="选择文件", command=lambda: self._choose_audio(True)
+            reminder_section, text="选择文件", command=lambda: self._choose_audio(False)
         ).grid(row=2, column=3)
 
-        ttk.Label(self.more_frame, text="噪音底色", style="Form.TLabel").grid(
-            row=3, column=0, sticky="e", pady=(12, 4)
+        ttk.Label(reminder_section, text="回归专注铃", style="Form.TLabel").grid(
+            row=3, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
+            reminder_section,
+            textvariable=self.return_audio_var,
+            values=tuple(AUDIO_OPTIONS),
+            state="readonly",
+            width=18,
+        ).grid(row=3, column=1, sticky="ew", padx=(12, 8), pady=4)
+        ttk.Button(
+            reminder_section, text="试听", command=lambda: self._test_audio(True)
+        ).grid(row=3, column=2, padx=4)
+        ttk.Button(
+            reminder_section, text="选择文件", command=lambda: self._choose_audio(True)
+        ).grid(row=3, column=3)
+
+        ambient_section = ttk.LabelFrame(
             self.more_frame,
+            text="持续背景音（可组合）",
+            padding=12,
+            style="Settings.TLabelframe",
+        )
+        ambient_section.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        ambient_section.columnconfigure(1, weight=1)
+
+        ttk.Label(ambient_section, text="噪音底色", style="Form.TLabel").grid(
+            row=0, column=0, sticky="e", pady=4
+        )
+        ttk.Combobox(
+            ambient_section,
             textvariable=self.ambient_var,
             values=tuple(NOISE_OPTIONS),
             state="readonly",
             width=24,
-        ).grid(row=3, column=1, sticky="ew", padx=(12, 8), pady=(12, 4))
+        ).grid(row=0, column=1, sticky="ew", padx=(12, 8), pady=4)
         ttk.Button(
-            self.more_frame, text="试听组合", command=self._preview_ambient
-        ).grid(row=3, column=2, padx=4, pady=(12, 4))
+            ambient_section, text="试听组合", command=self._preview_ambient
+        ).grid(row=0, column=2, padx=4, pady=4)
         ttk.Button(
-            self.more_frame, text="停止", command=self.audio.stop_ambient
-        ).grid(row=3, column=3, pady=(12, 4))
+            ambient_section, text="停止", command=self.audio.stop_ambient
+        ).grid(row=0, column=3, pady=4)
 
-        ttk.Label(self.more_frame, text="Solfeggio 频率", style="Form.TLabel").grid(
-            row=4, column=0, sticky="e", pady=4
+        ttk.Label(ambient_section, text="Solfeggio 频率", style="Form.TLabel").grid(
+            row=1, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
-            self.more_frame,
+            ambient_section,
             textvariable=self.solfeggio_var,
             values=tuple(SOLFEGGIO_OPTIONS),
             state="readonly",
             width=24,
-        ).grid(row=4, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
 
-        ttk.Label(self.more_frame, text="背景音量", style="Form.TLabel").grid(
-            row=5, column=0, sticky="e", pady=4
+        ttk.Label(ambient_section, text="背景音量", style="Form.TLabel").grid(
+            row=2, column=0, sticky="e", pady=4
         )
         ttk.Scale(
-            self.more_frame,
+            ambient_section,
             from_=0,
             to=100,
             variable=self.ambient_volume_var,
             command=self._on_ambient_volume_changed,
-        ).grid(row=5, column=1, columnspan=2, sticky="ew", padx=(12, 8), pady=4)
+        ).grid(row=2, column=1, columnspan=2, sticky="ew", padx=(12, 8), pady=4)
         ttk.Label(
-            self.more_frame,
+            ambient_section,
             textvariable=self.ambient_volume_label_var,
             style="FormHint.TLabel",
             width=5,
-        ).grid(row=5, column=3, sticky="w")
+        ).grid(row=2, column=3, sticky="w")
 
-        ttk.Separator(self.more_frame).grid(
-            row=6, column=0, columnspan=4, sticky="ew", pady=10
-        )
-        ttk.Checkbutton(
+        behavior_section = ttk.LabelFrame(
             self.more_frame,
+            text="界面、快捷键与启动",
+            padding=12,
+            style="Settings.TLabelframe",
+        )
+        behavior_section.grid(row=2, column=0, sticky="ew")
+        behavior_section.columnconfigure(1, weight=1)
+
+        ttk.Checkbutton(
+            behavior_section,
             text="显示下一次提醒的剩余时间（默认遮蔽，减少等待焦虑）",
             variable=self.show_next_reminder_var,
             style="Form.TCheckbutton",
-        ).grid(row=7, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=0, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Checkbutton(
-            self.more_frame,
+            behavior_section,
             text="显示置顶悬浮计时条（右键或 × 可临时隐藏）",
             variable=self.floating_status_var,
             command=self._on_floating_status_changed,
             style="Form.TCheckbutton",
-        ).grid(row=8, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Checkbutton(
-            self.more_frame,
+            behavior_section,
             text="启用全局快捷键",
             variable=self.global_hotkeys_var,
             command=self._on_global_hotkeys_changed,
             style="Form.TCheckbutton",
-        ).grid(row=9, column=0, columnspan=4, sticky="w", pady=4)
-        ttk.Label(self.more_frame, text="暂停 / 继续", style="Form.TLabel").grid(
-            row=10, column=0, sticky="e", pady=4
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
+        ttk.Label(behavior_section, text="暂停 / 继续", style="Form.TLabel").grid(
+            row=3, column=0, sticky="e", pady=4
         )
         self.pause_hotkey_box = ttk.Combobox(
-            self.more_frame,
+            behavior_section,
             textvariable=self.pause_hotkey_var,
             values=PAUSE_HOTKEY_PRESETS,
             width=24,
         )
         self.pause_hotkey_box.grid(
-            row=10, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4
+            row=3, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4
         )
-        ttk.Label(self.more_frame, text="显示 / 隐藏", style="Form.TLabel").grid(
-            row=11, column=0, sticky="e", pady=4
+        ttk.Label(behavior_section, text="显示 / 隐藏", style="Form.TLabel").grid(
+            row=4, column=0, sticky="e", pady=4
         )
         self.window_hotkey_box = ttk.Combobox(
-            self.more_frame,
+            behavior_section,
             textvariable=self.window_hotkey_var,
             values=WINDOW_HOTKEY_PRESETS,
             width=24,
         )
         self.window_hotkey_box.grid(
-            row=11, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4
+            row=4, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4
         )
         ttk.Checkbutton(
-            self.more_frame,
+            behavior_section,
             text="关闭主窗口时隐藏到托盘（任务栏不显示）",
             variable=self.close_to_tray_var,
             command=self._on_close_to_tray_changed,
             style="Form.TCheckbutton",
-        ).grid(row=12, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=5, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Label(
-            self.more_frame,
+            behavior_section,
             text="开机启动",
             style="Form.TLabel",
-        ).grid(row=13, column=0, sticky="e", pady=4)
+        ).grid(row=6, column=0, sticky="e", pady=4)
         startup_box = ttk.Combobox(
-            self.more_frame,
+            behavior_section,
             textvariable=self.startup_var,
             values=tuple(STARTUP_OPTIONS),
             state="readonly",
             width=30,
         )
-        startup_box.grid(row=13, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        startup_box.grid(row=6, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         startup_box.bind("<<ComboboxSelected>>", lambda _event: self._on_startup_changed())
 
         self.form_error = ttk.Label(
@@ -785,9 +828,23 @@ class CountdownApp:
         if self.more_visible:
             self.more_frame.grid(row=12, column=0, columnspan=3, sticky="ew")
             self.more_button.config(text="收起更多设置 ▴")
+            self.root.after_idle(self._reveal_more_settings)
         else:
             self.more_frame.grid_remove()
             self.more_button.config(text="更多设置 ▾")
+
+    def _reveal_more_settings(self) -> None:
+        if not self.more_visible or not self.basic_canvas.winfo_exists():
+            return
+        self.root.update_idletasks()
+        bounds = self.basic_canvas.bbox("all")
+        if bounds is None:
+            return
+        target_y = self.more_frame.winfo_rooty() - self.basic_content.winfo_rooty()
+        content_height = bounds[3] - bounds[1]
+        self.basic_canvas.yview_moveto(
+            scroll_fraction_to_reveal(target_y, content_height)
+        )
 
     def _on_close_to_tray_changed(self) -> None:
         updated = replace(

@@ -1,6 +1,6 @@
 import unittest
 
-from countdownapp.floating import FloatingStatusController
+from countdownapp.floating import FloatingStatusController, WorkArea, fit_window_position
 
 
 class FakeView:
@@ -78,6 +78,22 @@ class FloatingStatusControllerTests(unittest.TestCase):
         controller.begin_session()
         controller.update("25:00", "注意力锚定期")
         self.assertEqual(2, len(factory.views))
+
+
+class FloatingPositionTests(unittest.TestCase):
+    def test_keeps_a_visible_position_on_a_monitor_with_negative_coordinates(self):
+        area = WorkArea(-1920, 0, 0, 1040)
+
+        position = fit_window_position(-1200, 300, 280, 82, area)
+
+        self.assertEqual((-1200, 300), position)
+
+    def test_clamps_an_old_position_after_its_monitor_is_removed(self):
+        area = WorkArea(0, 0, 1920, 1040)
+
+        position = fit_window_position(5000, -100, 280, 82, area)
+
+        self.assertEqual((1632, 8), position)
 
 
 if __name__ == "__main__":

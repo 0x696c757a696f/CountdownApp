@@ -2,7 +2,7 @@ import logging
 import queue
 import unittest
 
-from countdownapp.hotkeys import GlobalHotkeyService
+from countdownapp.hotkeys import GlobalHotkeyService, parse_hotkey
 
 
 class FakeHotkeyBackend:
@@ -25,6 +25,36 @@ class FakeHotkeyBackend:
 
 
 class GlobalHotkeyServiceTests(unittest.TestCase):
+    def test_parses_custom_shortcuts_into_normalized_win32_bindings(self):
+        parsed = parse_hotkey("ctrl + alt + f9")
+
+        self.assertEqual("Ctrl+Alt+F9", parsed.display)
+        self.assertEqual(0x78, parsed.virtual_key)
+
+    def test_rejects_bare_keys_and_unsupported_names(self):
+        with self.assertRaisesRegex(ValueError, "modifier"):
+            parse_hotkey("P")
+        with self.assertRaisesRegex(ValueError, "Unsupported"):
+            parse_hotkey("Ctrl+Banana")
+
+    def test_registers_user_selected_shortcuts(self):
+        backend = FakeHotkeyBackend()
+        service = GlobalHotkeyService(queue.Queue(), logging.getLogger("test"), backend)
+
+        self.assertTrue(service.start("Ctrl+Alt+F9", "Win+Shift+Space"))
+
+        self.assertEqual(0x78, backend.registered[0][2])
+        self.assertEqual(0x20, backend.registered[1][2])
+
+    def test_rejects_duplicate_actions_without_touching_win32(self):
+        backend = FakeHotkeyBackend()
+        service = GlobalHotkeyService(queue.Queue(), logging.getLogger("test"), backend)
+
+        self.assertFalse(service.start("Ctrl+Alt+P", "ctrl + alt + p"))
+
+        self.assertEqual([], backend.registered)
+        self.assertIn("different", service.last_error)
+
     def test_registered_hotkeys_publish_commands_to_the_gui_queue(self):
         backend = FakeHotkeyBackend()
         commands = queue.Queue()

@@ -34,6 +34,10 @@ class AppSettings:
     show_next_reminder: bool = False
     global_hotkeys_enabled: bool = False
     floating_status_enabled: bool = False
+    floating_x: int | None = None
+    floating_y: int | None = None
+    pause_hotkey: str = "Alt+Shift+P"
+    window_hotkey: str = "Alt+Shift+O"
     migration_completed: bool = False
     schema_version: int = SCHEMA_VERSION
 
@@ -119,6 +123,10 @@ class ConfigStore:
                 "show_next_reminder": settings.show_next_reminder,
                 "global_hotkeys_enabled": settings.global_hotkeys_enabled,
                 "floating_status_enabled": settings.floating_status_enabled,
+                "floating_x": settings.floating_x,
+                "floating_y": settings.floating_y,
+                "pause_hotkey": settings.pause_hotkey,
+                "window_hotkey": settings.window_hotkey,
             },
             "ambient": {
                 "choice": settings.ambient_choice,
@@ -190,6 +198,10 @@ class ConfigStore:
         if "solfeggio_choice" not in ambient and ambient_choice.startswith("tone:"):
             solfeggio_choice = ambient_choice
             ambient_choice = "off"
+
+        def optional_int(value: object) -> int | None:
+            return None if value is None else int(value)
+
         return AppSettings(
             session=session,
             audio_choice=str(audio.get("choice", "0.wav")),
@@ -207,6 +219,10 @@ class ConfigStore:
             floating_status_enabled=bool(
                 behavior.get("floating_status_enabled", False)
             ),
+            floating_x=optional_int(behavior.get("floating_x")),
+            floating_y=optional_int(behavior.get("floating_y")),
+            pause_hotkey=str(behavior.get("pause_hotkey", "Alt+Shift+P")),
+            window_hotkey=str(behavior.get("window_hotkey", "Alt+Shift+O")),
             migration_completed=bool(data.get("migration_completed", False)),
             schema_version=SCHEMA_VERSION,
         )

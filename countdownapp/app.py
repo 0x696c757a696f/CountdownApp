@@ -5,6 +5,7 @@ import queue
 import sys
 import time
 import tkinter as tk
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from secrets import SystemRandom
@@ -75,6 +76,20 @@ SOLFEGGIO_OPTIONS = {
     "Solfeggio 963 Hz": "tone:963",
 }
 
+PAUSE_HOTKEY_PRESETS = (
+    "Alt+Shift+P",
+    "Ctrl+Alt+P",
+    "Ctrl+Shift+P",
+    "Alt+F9",
+)
+
+WINDOW_HOTKEY_PRESETS = (
+    "Alt+Shift+O",
+    "Ctrl+Alt+O",
+    "Ctrl+Shift+O",
+    "Alt+F10",
+)
+
 
 class CountdownApp:
     TICK_MS = 500
@@ -107,19 +122,22 @@ class CountdownApp:
         self.tray_commands: "queue.Queue[str]" = queue.Queue()
         self.tray = TrayService(resource_path("clock_icon.ico"), self.tray_commands, self.logger)
         self.hotkeys = GlobalHotkeyService(self.tray_commands, self.logger)
-        self.floating_status = FloatingStatusController(
-            lambda on_hide: TkFloatingStatusView(self.root, on_hide)
-        )
+        self.floating_status = FloatingStatusController(self._create_floating_status_view)
 
         self._configure_root()
         self._build_ui()
         self._load_form(self.app_settings)
         self.floating_status.set_enabled(self.app_settings.floating_status_enabled)
         hotkey_start_failed = bool(
-            self.app_settings.global_hotkeys_enabled and not self.hotkeys.start()
+            self.app_settings.global_hotkeys_enabled
+            and not self.hotkeys.start(
+                self.app_settings.pause_hotkey,
+                self.app_settings.window_hotkey,
+            )
         )
         if hotkey_start_failed:
             self.global_hotkeys_var.set(False)
+            self._refresh_hotkey_controls()
             self.app_settings = replace(self.app_settings, global_hotkeys_enabled=False)
             try:
                 self.store.save(self.app_settings)
@@ -148,7 +166,7 @@ class CountdownApp:
                 0,
                 lambda: messagebox.showwarning(
                     "全局快捷键不可用",
-                    "快捷键已被其他程序占用，功能已自动关闭。",
+                    f"{self.hotkeys.last_error}\n\n功能已自动关闭。",
                 ),
             )
         self.tray_after_id = self.root.after(self.TRAY_POLL_MS, self._poll_tray)
@@ -263,6 +281,8 @@ class CountdownApp:
         self.show_next_reminder_var = tk.BooleanVar()
         self.global_hotkeys_var = tk.BooleanVar()
         self.floating_status_var = tk.BooleanVar()
+        self.pause_hotkey_var = tk.StringVar()
+        self.window_hotkey_var = tk.StringVar()
         self.startup_var = tk.StringVar()
         self.custom_audio_path = ""
         self.return_custom_audio_path = ""
@@ -495,23 +515,47 @@ class CountdownApp:
         ).grid(row=8, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Checkbutton(
             self.more_frame,
-            text="启用全局快捷键（Alt+Shift+P 暂停；Alt+Shift+O 显示/隐藏）",
+            text="启用全局快捷键",
             variable=self.global_hotkeys_var,
             command=self._on_global_hotkeys_changed,
             style="Form.TCheckbutton",
         ).grid(row=9, column=0, columnspan=4, sticky="w", pady=4)
+        ttk.Label(self.more_frame, text="暂停 / 继续", style="Form.TLabel").grid(
+            row=10, column=0, sticky="e", pady=4
+        )
+        self.pause_hotkey_box = ttk.Combobox(
+            self.more_frame,
+            textvariable=self.pause_hotkey_var,
+            values=PAUSE_HOTKEY_PRESETS,
+            width=24,
+        )
+        self.pause_hotkey_box.grid(
+            row=10, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4
+        )
+        ttk.Label(self.more_frame, text="显示 / 隐藏", style="Form.TLabel").grid(
+            row=11, column=0, sticky="e", pady=4
+        )
+        self.window_hotkey_box = ttk.Combobox(
+            self.more_frame,
+            textvariable=self.window_hotkey_var,
+            values=WINDOW_HOTKEY_PRESETS,
+            width=24,
+        )
+        self.window_hotkey_box.grid(
+            row=11, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4
+        )
         ttk.Checkbutton(
             self.more_frame,
             text="关闭主窗口时隐藏到托盘（任务栏不显示）",
             variable=self.close_to_tray_var,
             command=self._on_close_to_tray_changed,
             style="Form.TCheckbutton",
-        ).grid(row=10, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=12, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Label(
             self.more_frame,
             text="开机启动",
             style="Form.TLabel",
-        ).grid(row=11, column=0, sticky="e", pady=4)
+        ).grid(row=13, column=0, sticky="e", pady=4)
         startup_box = ttk.Combobox(
             self.more_frame,
             textvariable=self.startup_var,
@@ -519,7 +563,7 @@ class CountdownApp:
             state="readonly",
             width=30,
         )
-        startup_box.grid(row=11, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        startup_box.grid(row=13, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         startup_box.bind("<<ComboboxSelected>>", lambda _event: self._on_startup_changed())
 
         self.form_error = ttk.Label(
@@ -660,6 +704,9 @@ class CountdownApp:
         self.show_next_reminder_var.set(settings.show_next_reminder)
         self.global_hotkeys_var.set(settings.global_hotkeys_enabled)
         self.floating_status_var.set(settings.floating_status_enabled)
+        self.pause_hotkey_var.set(settings.pause_hotkey)
+        self.window_hotkey_var.set(settings.window_hotkey)
+        self._refresh_hotkey_controls()
         self.startup_var.set(
             next(
                 label
@@ -742,18 +789,61 @@ class CountdownApp:
                 "本次关闭行为已经生效，但无法写入安装目录中的 settings.json。",
             )
 
+    def _create_floating_status_view(
+        self, on_hide: Callable[[], None]
+    ) -> TkFloatingStatusView:
+        initial_position = None
+        if (
+            self.app_settings.floating_x is not None
+            and self.app_settings.floating_y is not None
+        ):
+            initial_position = (
+                self.app_settings.floating_x,
+                self.app_settings.floating_y,
+            )
+        return TkFloatingStatusView(
+            self.root,
+            on_hide,
+            initial_position=initial_position,
+            on_position_changed=self._on_floating_position_changed,
+        )
+
+    def _on_floating_position_changed(self, x: int, y: int) -> None:
+        if self.app_settings.floating_x == x and self.app_settings.floating_y == y:
+            return
+        updated = replace(self.app_settings, floating_x=x, floating_y=y)
+        try:
+            self.store.save(updated)
+            self.app_settings = updated
+        except (OSError, ValueError) as error:
+            self.logger.warning("Saving floating window position failed: %s", error)
+
+    def _refresh_hotkey_controls(self) -> None:
+        state = "disabled" if self.global_hotkeys_var.get() else "normal"
+        self.pause_hotkey_box.configure(state=state)
+        self.window_hotkey_box.configure(state=state)
+
     def _on_global_hotkeys_changed(self) -> None:
         enabled = self.global_hotkeys_var.get()
-        if enabled and not self.hotkeys.start():
+        if enabled and not self.hotkeys.start(
+            self.pause_hotkey_var.get(), self.window_hotkey_var.get()
+        ):
             self.global_hotkeys_var.set(False)
             enabled = False
             messagebox.showwarning(
                 "全局快捷键不可用",
-                "Alt+Shift+P 或 Alt+Shift+O 已被其他程序占用，未启用快捷键。",
+                f"{self.hotkeys.last_error}\n\n"
+                "支持 Ctrl/Alt/Shift/Win 加 A–Z、0–9、F1–F12 或 Space。",
             )
         elif not enabled:
             self.hotkeys.stop()
-        updated = replace(self.app_settings, global_hotkeys_enabled=enabled)
+        self._refresh_hotkey_controls()
+        updated = replace(
+            self.app_settings,
+            global_hotkeys_enabled=enabled,
+            pause_hotkey=self.pause_hotkey_var.get().strip(),
+            window_hotkey=self.window_hotkey_var.get().strip(),
+        )
         try:
             self.store.save(updated)
             self.app_settings = updated
@@ -1011,6 +1101,10 @@ class CountdownApp:
             show_next_reminder=self.show_next_reminder_var.get(),
             global_hotkeys_enabled=self.global_hotkeys_var.get(),
             floating_status_enabled=self.floating_status_var.get(),
+            floating_x=self.app_settings.floating_x,
+            floating_y=self.app_settings.floating_y,
+            pause_hotkey=self.pause_hotkey_var.get().strip(),
+            window_hotkey=self.window_hotkey_var.get().strip(),
             migration_completed=True,
         )
         try:

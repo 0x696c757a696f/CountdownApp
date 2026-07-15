@@ -40,6 +40,10 @@ class ConfigStoreTests(unittest.TestCase):
                 show_next_reminder=True,
                 global_hotkeys_enabled=True,
                 floating_status_enabled=True,
+                floating_x=-1200,
+                floating_y=300,
+                pause_hotkey="Ctrl+Alt+P",
+                window_hotkey="Ctrl+Shift+O",
             )
 
             store.save(expected)

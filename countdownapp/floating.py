@@ -1,8 +1,95 @@
 from __future__ import annotations
 
+import ctypes
+import sys
 import tkinter as tk
 from collections.abc import Callable
+from ctypes import wintypes
+from dataclasses import dataclass
 from typing import Protocol
+
+
+@dataclass(frozen=True)
+class WorkArea:
+    left: int
+    top: int
+    right: int
+    bottom: int
+
+
+def fit_window_position(
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    work_area: WorkArea,
+    margin: int = 8,
+) -> tuple[int, int]:
+    minimum_x = work_area.left + margin
+    minimum_y = work_area.top + margin
+    maximum_x = max(minimum_x, work_area.right - width - margin)
+    maximum_y = max(minimum_y, work_area.bottom - height - margin)
+    return (
+        min(maximum_x, max(minimum_x, x)),
+        min(maximum_y, max(minimum_y, y)),
+    )
+
+
+class MonitorProvider(Protocol):
+    def work_area_for_window(self, window_handle: int) -> WorkArea: ...
+
+    def work_area_for_point(self, x: int, y: int) -> WorkArea: ...
+
+
+class _MonitorInfo(ctypes.Structure):
+    _fields_ = (
+        ("cbSize", wintypes.DWORD),
+        ("rcMonitor", wintypes.RECT),
+        ("rcWork", wintypes.RECT),
+        ("dwFlags", wintypes.DWORD),
+    )
+
+
+class Win32MonitorProvider:
+    MONITOR_DEFAULTTONEAREST = 0x00000002
+
+    def __init__(self) -> None:
+        if sys.platform != "win32":
+            raise OSError("Monitor work areas are only available on Windows")
+        self._user32 = ctypes.WinDLL("user32", use_last_error=True)
+        self._user32.MonitorFromWindow.argtypes = (wintypes.HWND, wintypes.DWORD)
+        self._user32.MonitorFromWindow.restype = wintypes.HANDLE
+        self._user32.MonitorFromPoint.argtypes = (wintypes.POINT, wintypes.DWORD)
+        self._user32.MonitorFromPoint.restype = wintypes.HANDLE
+        self._user32.GetMonitorInfoW.argtypes = (
+            wintypes.HANDLE,
+            ctypes.POINTER(_MonitorInfo),
+        )
+        self._user32.GetMonitorInfoW.restype = wintypes.BOOL
+
+    def work_area_for_window(self, window_handle: int) -> WorkArea:
+        monitor = self._user32.MonitorFromWindow(
+            window_handle, self.MONITOR_DEFAULTTONEAREST
+        )
+        return self._work_area(monitor)
+
+    def work_area_for_point(self, x: int, y: int) -> WorkArea:
+        monitor = self._user32.MonitorFromPoint(
+            wintypes.POINT(x, y), self.MONITOR_DEFAULTTONEAREST
+        )
+        return self._work_area(monitor)
+
+    def _work_area(self, monitor: int) -> WorkArea:
+        info = _MonitorInfo()
+        info.cbSize = ctypes.sizeof(info)
+        if not monitor or not self._user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+            raise OSError(ctypes.get_last_error(), "Unable to read monitor work area")
+        return WorkArea(
+            info.rcWork.left,
+            info.rcWork.top,
+            info.rcWork.right,
+            info.rcWork.bottom,
+        )
 
 
 class FloatingStatusView(Protocol):
@@ -67,16 +154,28 @@ class TkFloatingStatusView:
     WIDTH = 280
     HEIGHT = 82
 
-    def __init__(self, root: tk.Misc, on_hide: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        root: tk.Misc,
+        on_hide: Callable[[], None],
+        initial_position: tuple[int, int] | None = None,
+        on_position_changed: Callable[[int, int], None] | None = None,
+        monitor_provider: MonitorProvider | None = None,
+    ) -> None:
+        self.root = root
+        self._on_position_changed = on_position_changed
+        try:
+            self._monitor_provider = monitor_provider or Win32MonitorProvider()
+        except OSError:
+            self._monitor_provider = None
         self.window = tk.Toplevel(root)
         self.window.title("CountdownApp 悬浮计时")
         self.window.overrideredirect(True)
         self.window.attributes("-topmost", True)
         self.window.attributes("-alpha", 0.94)
         self.window.configure(bg="#172033")
-        x = max(0, self.window.winfo_screenwidth() - self.WIDTH - 24)
-        y = max(0, self.window.winfo_screenheight() - self.HEIGHT - 72)
-        self.window.geometry(f"{self.WIDTH}x{self.HEIGHT}+{x}+{y}")
+        x, y = self._initial_position(initial_position)
+        self._set_geometry(x, y, include_size=True)
 
         self.timer_label = tk.Label(
             self.window,
@@ -112,6 +211,7 @@ class TkFloatingStatusView:
         for widget in (self.window, self.timer_label, self.phase_label):
             widget.bind("<ButtonPress-1>", self._start_drag)
             widget.bind("<B1-Motion>", self._drag)
+            widget.bind("<ButtonRelease-1>", self._finish_drag)
             widget.bind("<Button-3>", lambda _event: on_hide())
 
     def update(self, timer_text: str, phase_text: str) -> None:
@@ -131,4 +231,61 @@ class TkFloatingStatusView:
         if self._drag_origin is None:
             return
         offset_x, offset_y = self._drag_origin
-        self.window.geometry(f"+{event.x_root - offset_x}+{event.y_root - offset_y}")
+        self._set_geometry(event.x_root - offset_x, event.y_root - offset_y)
+
+    def _finish_drag(self, _event: tk.Event) -> None:
+        if self._drag_origin is None:
+            return
+        self._drag_origin = None
+        x, y = self._fit_to_nearest_monitor(self.window.winfo_x(), self.window.winfo_y())
+        self._set_geometry(x, y)
+        if self._on_position_changed is not None:
+            self._on_position_changed(x, y)
+
+    def _initial_position(
+        self, initial_position: tuple[int, int] | None
+    ) -> tuple[int, int]:
+        if initial_position is not None:
+            return self._fit_to_nearest_monitor(*initial_position)
+        area = self._work_area_for_window()
+        return fit_window_position(
+            area.right - self.WIDTH - 24,
+            area.bottom - self.HEIGHT - 24,
+            self.WIDTH,
+            self.HEIGHT,
+            area,
+        )
+
+    def _fit_to_nearest_monitor(self, x: int, y: int) -> tuple[int, int]:
+        area = self._work_area_for_point(x, y)
+        return fit_window_position(x, y, self.WIDTH, self.HEIGHT, area)
+
+    def _work_area_for_window(self) -> WorkArea:
+        if self._monitor_provider is not None:
+            try:
+                return self._monitor_provider.work_area_for_window(self.root.winfo_id())
+            except OSError:
+                pass
+        return self._virtual_root_area()
+
+    def _work_area_for_point(self, x: int, y: int) -> WorkArea:
+        if self._monitor_provider is not None:
+            try:
+                return self._monitor_provider.work_area_for_point(x, y)
+            except OSError:
+                pass
+        return self._virtual_root_area()
+
+    def _virtual_root_area(self) -> WorkArea:
+        left = self.root.winfo_vrootx()
+        top = self.root.winfo_vrooty()
+        return WorkArea(
+            left,
+            top,
+            left + self.root.winfo_vrootwidth(),
+            top + self.root.winfo_vrootheight(),
+        )
+
+    def _set_geometry(self, x: int, y: int, include_size: bool = False) -> None:
+        prefix = f"{self.WIDTH}x{self.HEIGHT}" if include_size else ""
+        self.window.geometry(f"{prefix}{x:+d}{y:+d}")

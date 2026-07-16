@@ -39,8 +39,8 @@ class AmbientTaskStub:
         self.events = []
         self.play_result = play_result
 
-    def request(self, noise, tone, volume, on_complete=None):
-        self.events.append(("request", noise, tone, volume))
+    def request(self, sources, volume, on_complete=None):
+        self.events.append(("request", sources, volume))
         if on_complete is not None:
             on_complete(self.play_result)
 
@@ -60,8 +60,9 @@ class StoreStub:
 
 
 class SettingsFormStub:
-    def __init__(self, ambient, solfeggio):
+    def __init__(self, ambient, texture, solfeggio):
         self.ambient = ambient
+        self.ambient_texture = texture
         self.solfeggio = solfeggio
 
     @property
@@ -78,6 +79,25 @@ class SettingsFormStub:
             "Solfeggio 528 Hz": "tone:528",
         }.get(self.solfeggio.get(), "off")
 
+    @property
+    def ambient_texture_value(self):
+        return {
+            "关闭": "off",
+            "柔和雨声": "texture:rain",
+        }.get(self.ambient_texture.get(), "off")
+
+    @property
+    def ambient_sources(self):
+        return tuple(
+            source
+            for source in (
+                self.ambient_value,
+                self.ambient_texture_value,
+                self.solfeggio_value,
+            )
+            if source != "off"
+        )
+
 
 class RuntimeAmbientTests(unittest.TestCase):
     @staticmethod
@@ -89,9 +109,12 @@ class RuntimeAmbientTests(unittest.TestCase):
         app.app_settings = AppSettings()
         app.focus = SimpleNamespace(state=state)
         app.ambient_var = ValueStub("粉红噪音")
+        app.ambient_texture_var = ValueStub("柔和雨声")
         app.solfeggio_var = ValueStub("Solfeggio 528 Hz")
         app.settings_form = SettingsFormStub(
-            app.ambient_var, app.solfeggio_var
+            app.ambient_var,
+            app.ambient_texture_var,
+            app.solfeggio_var,
         )
         app.ambient_volume_var = ValueStub(35)
         app.ambient_volume_label_var = ValueStub("")
@@ -107,16 +130,19 @@ class RuntimeAmbientTests(unittest.TestCase):
         app._apply_runtime_ambient()
 
         self.assertEqual(
-            [("request", "pink", "tone:528", 0.35)],
+            [("request", ("pink", "texture:rain", "tone:528"), 0.35)],
             app.ambient_tasks.events,
         )
         self.assertEqual([], app.audio.events)
         self.assertEqual("pink", app.app_settings.ambient_choice)
+        self.assertEqual(
+            "texture:rain", app.app_settings.ambient_texture_choice
+        )
         self.assertEqual("tone:528", app.app_settings.solfeggio_choice)
         self.assertEqual(35, app.app_settings.ambient_volume)
         self.assertEqual([app.app_settings], app.store.saved)
         self.assertEqual(
-            "粉红噪音 + Solfeggio 528 Hz · 35%",
+            "粉红噪音 + 柔和雨声 + Solfeggio 528 Hz · 35%",
             app.runtime_summary.get(),
         )
 
@@ -133,6 +159,7 @@ class RuntimeAmbientTests(unittest.TestCase):
     def test_turning_background_audio_off_cancels_pending_rendering(self):
         app = self.make_app()
         app.ambient_var.set("关闭")
+        app.ambient_texture_var.set("关闭")
         app.solfeggio_var.set("关闭")
 
         app._apply_runtime_ambient()

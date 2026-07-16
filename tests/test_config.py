@@ -47,6 +47,7 @@ class ConfigStoreTests(unittest.TestCase):
                 return_audio_choice="custom",
                 return_custom_audio_path="D:/sounds/return.mp3",
                 ambient_choice="pink",
+                ambient_texture_choice="texture:rain",
                 solfeggio_choice="tone:639",
                 ambient_volume=23,
                 close_to_tray=False,
@@ -83,6 +84,7 @@ class ConfigStoreTests(unittest.TestCase):
             self.assertEqual("2.wav", loaded.audio_choice)
             self.assertEqual("1.wav", loaded.return_audio_choice)
             self.assertEqual("off", loaded.ambient_choice)
+            self.assertEqual("off", loaded.ambient_texture_choice)
             self.assertEqual("off", loaded.solfeggio_choice)
             self.assertEqual(20, loaded.ambient_volume)
 

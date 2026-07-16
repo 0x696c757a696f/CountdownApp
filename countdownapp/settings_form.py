@@ -33,6 +33,13 @@ NOISE_OPTIONS = {
     "灰噪音（近似等响度）": "grey",
 }
 
+AMBIENT_TEXTURE_OPTIONS = {
+    "关闭": "off",
+    "语音遮蔽（降低人声干扰）": "texture:speech",
+    "柔和雨声": "texture:rain",
+    "风扇气流": "texture:airflow",
+}
+
 SOLFEGGIO_OPTIONS = {
     "关闭": "off",
     "Solfeggio 174 Hz": "tone:174",
@@ -71,6 +78,7 @@ class SettingsForm:
         self.audio = tk.StringVar(master)
         self.return_audio = tk.StringVar(master)
         self.ambient = tk.StringVar(master)
+        self.ambient_texture = tk.StringVar(master)
         self.solfeggio = tk.StringVar(master)
         self.ambient_volume = tk.DoubleVar(master)
         self.ambient_volume_label = tk.StringVar(master)
@@ -133,6 +141,13 @@ class SettingsForm:
         )
         self.return_custom_audio_path = settings.return_custom_audio_path
         self.ambient.set(self._label_for(NOISE_OPTIONS, settings.ambient_choice, "关闭"))
+        self.ambient_texture.set(
+            self._label_for(
+                AMBIENT_TEXTURE_OPTIONS,
+                settings.ambient_texture_choice,
+                "关闭",
+            )
+        )
         self.solfeggio.set(
             self._label_for(SOLFEGGIO_OPTIONS, settings.solfeggio_choice, "关闭")
         )
@@ -206,6 +221,7 @@ class SettingsForm:
             return_audio_choice=self.return_audio_value,
             return_custom_audio_path=self.return_custom_audio_path,
             ambient_choice=self.ambient_value,
+            ambient_texture_choice=self.ambient_texture_value,
             solfeggio_choice=self.solfeggio_value,
             ambient_volume=round(self.ambient_volume.get()),
             close_to_tray=self.close_to_tray.get(),
@@ -241,8 +257,24 @@ class SettingsForm:
         return NOISE_OPTIONS.get(self.ambient.get(), "off")
 
     @property
+    def ambient_texture_value(self) -> str:
+        return AMBIENT_TEXTURE_OPTIONS.get(self.ambient_texture.get(), "off")
+
+    @property
     def solfeggio_value(self) -> str:
         return SOLFEGGIO_OPTIONS.get(self.solfeggio.get(), "off")
+
+    @property
+    def ambient_sources(self) -> tuple[str, ...]:
+        return tuple(
+            source
+            for source in (
+                self.ambient_value,
+                self.ambient_texture_value,
+                self.solfeggio_value,
+            )
+            if source != "off"
+        )
 
     @property
     def ambient_volume_fraction(self) -> float:

@@ -6,6 +6,7 @@ from array import array
 
 
 NOISE_KINDS = {"white", "pink", "brown", "grey"}
+TEXTURE_KINDS = {"texture:speech", "texture:rain", "texture:airflow"}
 
 
 def synthesize_mono(
@@ -34,7 +35,7 @@ def synthesize_mono(
                 for index in range(sample_count)
             ),
         )
-    if kind not in NOISE_KINDS:
+    if kind not in NOISE_KINDS | TEXTURE_KINDS:
         raise ValueError(f"Unknown ambient sound: {kind}")
 
     overlap = min(max(16, round(sample_rate * 0.03)), max(1, sample_count // 4))
@@ -48,8 +49,14 @@ def synthesize_mono(
         shaped = _pink_noise(white)
     elif kind == "brown":
         shaped = _brown_noise(white)
-    else:
+    elif kind == "grey":
         shaped = _grey_noise(white)
+    elif kind == "texture:speech":
+        shaped = _speech_masker(white, sample_rate)
+    elif kind == "texture:rain":
+        shaped = _soft_rain(white, sample_rate, generator)
+    else:
+        shaped = _airflow(white, sample_rate, generator)
 
     loop = shaped[:sample_count]
     for index in range(overlap):
@@ -74,12 +81,13 @@ def synthesize_mix(
     active = tuple(source for source in sources if source != "off")
     if not active:
         raise ValueError("At least one ambient source is required")
+    seed_generator = random.Random(seed)
     layers = [
         synthesize_mono(
             source,
             sample_rate=sample_rate,
             duration_sec=duration_sec,
-            seed=seed,
+            seed=seed_generator.getrandbits(64),
         )
         for source in active
     ]
@@ -130,4 +138,59 @@ def _grey_noise(white: list[float]) -> list[float]:
         medium += 0.06 * (value - medium)
         high = value - medium
         result.append(0.52 * value + 1.15 * slow + 0.22 * high)
+    return result
+
+
+def _low_pass(values: list[float], cutoff_hz: float, sample_rate: int) -> list[float]:
+    alpha = 1.0 - math.exp(-2.0 * math.pi * cutoff_hz / sample_rate)
+    previous = 0.0
+    result: list[float] = []
+    for value in values:
+        previous += alpha * (value - previous)
+        result.append(previous)
+    return result
+
+
+def _speech_masker(white: list[float], sample_rate: int) -> list[float]:
+    """Shape noise around speech frequencies without containing intelligible speech."""
+    below_upper = _low_pass(white, 3_200.0, sample_rate)
+    below_lower = _low_pass(white, 250.0, sample_rate)
+    return [upper - lower for upper, lower in zip(below_upper, below_lower)]
+
+
+def _soft_rain(
+    white: list[float], sample_rate: int, generator: random.Random
+) -> list[float]:
+    """Create steady rain from filtered noise and restrained droplet transients."""
+    pink = _pink_noise(white)
+    low = _low_pass(white, 900.0, sample_rate)
+    droplet = 0.0
+    decay = math.exp(-18.0 / sample_rate)
+    probability = min(1.0, 14.0 / sample_rate)
+    result: list[float] = []
+    for index, value in enumerate(white):
+        if generator.random() < probability:
+            droplet += generator.uniform(0.25, 0.7)
+        droplet *= decay
+        hiss = value - low[index]
+        result.append(0.16 * pink[index] + 0.52 * hiss + 0.18 * droplet * value)
+    return result
+
+
+def _airflow(
+    white: list[float], sample_rate: int, generator: random.Random
+) -> list[float]:
+    """Create stable fan-like airflow with gentle, non-rhythmic movement."""
+    pink = _pink_noise(white)
+    body = _low_pass(white, 420.0, sample_rate)
+    phase = generator.uniform(0.0, 2.0 * math.pi)
+    result: list[float] = []
+    for index, value in enumerate(white):
+        movement = 0.88 + 0.12 * math.sin(
+            phase + 2.0 * math.pi * 0.17 * index / sample_rate
+        )
+        result.append(
+            movement * (0.18 * pink[index] + 0.72 * body[index])
+            + 0.04 * value
+        )
     return result

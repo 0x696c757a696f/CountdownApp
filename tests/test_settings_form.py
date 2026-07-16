@@ -62,6 +62,26 @@ class SettingsFormTests(unittest.TestCase):
         self.assertEqual((-640, 80), (result.floating_x, result.floating_y))
         self.assertTrue(result.migration_completed)
 
+    def test_environment_texture_round_trips_through_app_settings(self):
+        previous = replace(
+            AppSettings(),
+            ambient_choice="pink",
+            ambient_texture_choice="texture:rain",
+            solfeggio_choice="tone:528",
+        )
+        self.form.load(previous)
+
+        result = self.form.build_app_settings(
+            previous, self.form.build_session_settings()
+        )
+
+        self.assertEqual("texture:rain", self.form.ambient_texture_value)
+        self.assertEqual("texture:rain", result.ambient_texture_choice)
+        self.assertEqual(
+            ("pink", "texture:rain", "tone:528"),
+            self.form.ambient_sources,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

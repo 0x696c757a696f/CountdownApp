@@ -28,6 +28,7 @@ class AppSettings:
     return_audio_choice: str = "1.wav"
     return_custom_audio_path: str = ""
     ambient_choice: str = "off"
+    ambient_texture_choice: str = "off"
     solfeggio_choice: str = "off"
     ambient_volume: int = 20
     close_to_tray: bool = True
@@ -135,6 +136,7 @@ class ConfigStore:
             },
             "ambient": {
                 "choice": settings.ambient_choice,
+                "texture_choice": settings.ambient_texture_choice,
                 "solfeggio_choice": settings.solfeggio_choice,
                 "volume": settings.ambient_volume,
             },
@@ -220,6 +222,7 @@ class ConfigStore:
         behavior = data.get("behavior", {})
         ambient = data.get("ambient", {})
         ambient_choice = str(ambient.get("choice", "off"))
+        ambient_texture_choice = str(ambient.get("texture_choice", "off"))
         solfeggio_choice = str(ambient.get("solfeggio_choice", "off"))
         if "solfeggio_choice" not in ambient and ambient_choice.startswith("tone:"):
             solfeggio_choice = ambient_choice
@@ -235,6 +238,7 @@ class ConfigStore:
             return_audio_choice=str(audio.get("return_choice", "1.wav")),
             return_custom_audio_path=str(audio.get("return_custom_path", "")),
             ambient_choice=ambient_choice,
+            ambient_texture_choice=ambient_texture_choice,
             solfeggio_choice=solfeggio_choice,
             ambient_volume=max(0, min(100, int(ambient.get("volume", 20)))),
             close_to_tray=decode_bool(

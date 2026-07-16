@@ -8,6 +8,7 @@ from tkinter import ttk
 from .presentation import responsive_window_layout, scroll_fraction_to_reveal
 from .reminder_view import FLOW_FEEDBACK_LABEL
 from .settings_form import (
+    AMBIENT_TEXTURE_OPTIONS,
     AUDIO_OPTIONS,
     NOISE_OPTIONS,
     SOLFEGGIO_OPTIONS,
@@ -369,7 +370,7 @@ class SettingsView:
         )
         section.grid(row=1, column=0, sticky="ew", pady=(0, 10))
         section.columnconfigure(1, weight=1)
-        ttk.Label(section, text="噪音底色", style="Form.TLabel").grid(
+        ttk.Label(section, text="基础噪音", style="Form.TLabel").grid(
             row=0, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
@@ -389,8 +390,18 @@ class SettingsView:
             text="停止",
             command=self._bindings.on_stop_ambient,
         ).grid(row=0, column=3, pady=4)
-        ttk.Label(section, text="Solfeggio 频率", style="Form.TLabel").grid(
+        ttk.Label(section, text="环境纹理", style="Form.TLabel").grid(
             row=1, column=0, sticky="e", pady=4
+        )
+        ttk.Combobox(
+            section,
+            textvariable=self._form.ambient_texture,
+            values=tuple(AMBIENT_TEXTURE_OPTIONS),
+            state="readonly",
+            width=24,
+        ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        ttk.Label(section, text="Solfeggio 频率", style="Form.TLabel").grid(
+            row=2, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
             section,
@@ -398,9 +409,9 @@ class SettingsView:
             values=tuple(SOLFEGGIO_OPTIONS),
             state="readonly",
             width=24,
-        ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        ).grid(row=2, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         ttk.Label(section, text="背景音量", style="Form.TLabel").grid(
-            row=2, column=0, sticky="e", pady=4
+            row=3, column=0, sticky="e", pady=4
         )
         ttk.Scale(
             section,
@@ -408,13 +419,13 @@ class SettingsView:
             to=100,
             variable=self._form.ambient_volume,
             command=self._bindings.on_ambient_volume_change,
-        ).grid(row=2, column=1, columnspan=2, sticky="ew", padx=(12, 8), pady=4)
+        ).grid(row=3, column=1, columnspan=2, sticky="ew", padx=(12, 8), pady=4)
         ttk.Label(
             section,
             textvariable=self._form.ambient_volume_label,
             style="FormHint.TLabel",
             width=5,
-        ).grid(row=2, column=3, sticky="w")
+        ).grid(row=3, column=3, sticky="w")
 
     def _build_behavior_section(self) -> None:
         section = ttk.LabelFrame(

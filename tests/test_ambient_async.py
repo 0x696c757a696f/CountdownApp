@@ -57,18 +57,28 @@ class AsyncAmbientControllerTests(unittest.TestCase):
             executor=executor,
         )
 
-        controller.request("pink", "off", 0.2, completed.append)
-        controller.request("brown", "tone:528", 0.35, completed.append)
+        controller.request(("pink",), 0.2, completed.append)
+        controller.request(
+            ("brown", "texture:rain", "tone:528"),
+            0.35,
+            completed.append,
+        )
         executor.futures[0].complete(
             PreparedAmbient(("pink",), array("h", [1]), 44_100)
         )
         executor.futures[1].complete(
-            PreparedAmbient(("brown", "tone:528"), array("h", [2]), 44_100)
+            PreparedAmbient(
+                ("brown", "texture:rain", "tone:528"),
+                array("h", [2]),
+                44_100,
+            )
         )
 
         self.assertEqual(1, len(dispatched))
         dispatched.pop()()
-        self.assertEqual([(("brown", "tone:528"), 0.35)], played)
+        self.assertEqual(
+            [(("brown", "texture:rain", "tone:528"), 0.35)], played
+        )
         self.assertEqual([True], completed)
 
     def test_cancel_prevents_a_pending_mix_from_starting_later(self):
@@ -81,7 +91,7 @@ class AsyncAmbientControllerTests(unittest.TestCase):
             executor=executor,
         )
 
-        controller.request("grey", "tone:174", 0.2)
+        controller.request(("grey", "tone:174"), 0.2)
         controller.cancel()
         executor.futures[0].complete(
             PreparedAmbient(("grey", "tone:174"), array("h", [1]), 44_100)
@@ -100,7 +110,7 @@ class AsyncAmbientControllerTests(unittest.TestCase):
             executor=executor,
         )
 
-        controller.request("pink", "off", 0.2)
+        controller.request(("pink",), 0.2)
         controller.set_volume(0.55)
         executor.futures[0].complete(
             PreparedAmbient(("pink",), array("h", [1]), 44_100)
@@ -120,7 +130,7 @@ class AsyncAmbientControllerTests(unittest.TestCase):
             executor=executor,
         )
 
-        controller.request("white", "off", 0.2, completed.append)
+        controller.request(("white",), 0.2, completed.append)
         executor.futures[0].complete(error=RuntimeError("render failed"))
 
         dispatched.pop()()

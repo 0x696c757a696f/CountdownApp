@@ -81,6 +81,21 @@ class SettingsViewTests(unittest.TestCase):
 
         self.bindings.on_start_focus.assert_called_once_with()
 
+    def test_background_audio_groups_three_combinable_layers(self):
+        self.view.show()
+        more = next(
+            child
+            for child in self._all_widgets(self.root)
+            if isinstance(child, ttk.Button) and child.cget("text") == "更多设置 ▾"
+        )
+        more.invoke()
+        self.root.update_idletasks()
+
+        texts = self._texts(self.root)
+        self.assertIn("基础噪音", texts)
+        self.assertIn("环境纹理", texts)
+        self.assertIn("Solfeggio 频率", texts)
+
     @staticmethod
     def _all_widgets(widget):
         for child in widget.winfo_children():

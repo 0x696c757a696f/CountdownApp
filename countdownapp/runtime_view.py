@@ -11,6 +11,7 @@ from .presentation import RenderCache, runtime_window_layout
 @dataclass(frozen=True)
 class RuntimeBindings:
     noise_var: tk.StringVar
+    texture_var: tk.StringVar
     tone_var: tk.StringVar
     volume_var: tk.DoubleVar
     volume_label_var: tk.StringVar
@@ -39,6 +40,7 @@ class RuntimeView:
         root: tk.Tk,
         bindings: RuntimeBindings,
         noise_options: Sequence[str],
+        texture_options: Sequence[str],
         tone_options: Sequence[str],
     ) -> None:
         self._root = root
@@ -49,7 +51,7 @@ class RuntimeView:
 
         self.frame = ttk.Frame(root, padding=(24, 16), style="App.TFrame")
         self._build_dashboard()
-        self._build_ambient_card(noise_options, tone_options)
+        self._build_ambient_card(noise_options, texture_options, tone_options)
         self._build_actions()
 
     @property
@@ -175,7 +177,10 @@ class RuntimeView:
         self._feedback_label.pack(anchor="w", pady=2)
 
     def _build_ambient_card(
-        self, noise_options: Sequence[str], tone_options: Sequence[str]
+        self,
+        noise_options: Sequence[str],
+        texture_options: Sequence[str],
+        tone_options: Sequence[str],
     ) -> None:
         self._ambient_card = ttk.Frame(
             self.frame, padding=(16, 10), style="Form.TFrame"
@@ -217,13 +222,16 @@ class RuntimeView:
         )
         self._ambient_controls.columnconfigure(1, weight=1)
         self._ambient_combobox_row(
-            0, "噪音底色", self._bindings.noise_var, noise_options
+            0, "基础噪音", self._bindings.noise_var, noise_options
         )
         self._ambient_combobox_row(
-            1, "Solfeggio", self._bindings.tone_var, tone_options
+            1, "环境纹理", self._bindings.texture_var, texture_options
+        )
+        self._ambient_combobox_row(
+            2, "Solfeggio", self._bindings.tone_var, tone_options
         )
         ttk.Label(self._ambient_controls, text="音量", style="Form.TLabel").grid(
-            row=2, column=0, sticky="e", pady=4
+            row=3, column=0, sticky="e", pady=4
         )
         volume = ttk.Scale(
             self._ambient_controls,
@@ -232,7 +240,7 @@ class RuntimeView:
             variable=self._bindings.volume_var,
             command=self._bindings.on_volume_change,
         )
-        volume.grid(row=2, column=1, sticky="ew", padx=(12, 8), pady=4)
+        volume.grid(row=3, column=1, sticky="ew", padx=(12, 8), pady=4)
         volume.bind("<ButtonRelease-1>", lambda _event: self._bindings.on_volume_commit())
         volume.bind("<KeyRelease>", lambda _event: self._bindings.on_volume_commit())
         ttk.Label(
@@ -240,7 +248,7 @@ class RuntimeView:
             textvariable=self._bindings.volume_label_var,
             style="FormHint.TLabel",
             width=5,
-        ).grid(row=2, column=2, sticky="w")
+        ).grid(row=3, column=2, sticky="w")
 
     def _ambient_combobox_row(
         self,

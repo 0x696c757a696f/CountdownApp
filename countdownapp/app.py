@@ -42,6 +42,7 @@ from .reminder_view import (
 from .runtime_view import RuntimeBindings, RuntimeDisplay, RuntimeView
 from .session import RuntimeEventKind
 from .settings_form import (
+    AMBIENT_TEXTURE_OPTIONS,
     NOISE_OPTIONS,
     SOLFEGGIO_OPTIONS,
     SettingsForm,
@@ -259,6 +260,7 @@ class CountdownApp:
         self.audio_var = self.settings_form.audio
         self.return_audio_var = self.settings_form.return_audio
         self.ambient_var = self.settings_form.ambient
+        self.ambient_texture_var = self.settings_form.ambient_texture
         self.solfeggio_var = self.settings_form.solfeggio
         self.ambient_volume_var = self.settings_form.ambient_volume
         self.ambient_volume_label_var = self.settings_form.ambient_volume_label
@@ -299,6 +301,7 @@ class CountdownApp:
             self.root,
             RuntimeBindings(
                 noise_var=self.ambient_var,
+                texture_var=self.ambient_texture_var,
                 tone_var=self.solfeggio_var,
                 volume_var=self.ambient_volume_var,
                 volume_label_var=self.ambient_volume_label_var,
@@ -311,6 +314,7 @@ class CountdownApp:
                 on_hide=self._minimize_to_tray,
             ),
             noise_options=tuple(NOISE_OPTIONS),
+            texture_options=tuple(AMBIENT_TEXTURE_OPTIONS),
             tone_options=tuple(SOLFEGGIO_OPTIONS),
         )
 
@@ -450,12 +454,11 @@ class CountdownApp:
 
     def _play_ambient_selection(
         self,
-        noise: str,
-        tone: str,
+        sources: tuple[str, ...],
         volume: float,
         on_complete: Callable[[bool], None] | None = None,
     ) -> None:
-        if noise == "off" and tone == "off":
+        if not sources:
             self._stop_ambient_playback()
             if on_complete is not None:
                 on_complete(True)
@@ -470,33 +473,30 @@ class CountdownApp:
             if on_complete is not None:
                 on_complete(played)
 
-        self.ambient_tasks.request(noise, tone, volume, completed)
+        self.ambient_tasks.request(sources, volume, completed)
 
     def _preview_ambient(self) -> None:
         self._play_ambient_selection(
-            self.settings_form.ambient_value,
-            self.settings_form.solfeggio_value,
+            self.settings_form.ambient_sources,
             self.settings_form.ambient_volume_fraction,
         )
 
     def _apply_runtime_ambient(self) -> None:
-        noise = self.settings_form.ambient_value
-        tone = self.settings_form.solfeggio_value
+        sources = self.settings_form.ambient_sources
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
         self._save_runtime_ambient_preferences()
-        if noise != "off" or tone != "off":
+        if sources:
             self.runtime_view.set_ambient_summary("正在准备背景音…")
         self._play_ambient_selection(
-            noise,
-            tone,
+            sources,
             volume / 100.0,
             lambda played: self._runtime_ambient_completed(
-                noise, tone, volume, played
+                sources, volume, played
             ),
         )
 
     def _runtime_ambient_completed(
-        self, noise: str, tone: str, volume: int, played: bool
+        self, sources: tuple[str, ...], volume: int, played: bool
     ) -> None:
         if played and self.focus.state is SessionState.PAUSED:
             self.audio.pause_ambient()
@@ -506,7 +506,7 @@ class CountdownApp:
             )
         else:
             self.runtime_view.set_ambient_summary(
-                format_ambient_summary(noise, tone, volume)
+                format_ambient_summary(sources, volume)
             )
 
     def _stop_ambient_playback(self) -> None:
@@ -515,12 +515,14 @@ class CountdownApp:
 
     def _save_runtime_ambient_preferences(self) -> None:
         noise = self.settings_form.ambient_value
+        texture = self.settings_form.ambient_texture_value
         tone = self.settings_form.solfeggio_value
         volume = min(100, max(0, round(self.ambient_volume_var.get())))
 
         updated = replace(
             self.app_settings,
             ambient_choice=noise,
+            ambient_texture_choice=texture,
             solfeggio_choice=tone,
             ambient_volume=volume,
         )
@@ -531,7 +533,7 @@ class CountdownApp:
             self.logger.warning("Saving runtime ambient setting failed: %s", error)
         self.ambient_volume_label_var.set(f"{volume}%")
         self.runtime_view.set_ambient_summary(
-            format_ambient_summary(noise, tone, volume)
+            format_ambient_summary(self.settings_form.ambient_sources, volume)
         )
 
     def _on_runtime_ambient_volume_changed(self, value: str) -> None:
@@ -541,14 +543,14 @@ class CountdownApp:
         self.audio.set_ambient_volume(volume / 100.0)
         self.runtime_view.set_ambient_summary(
             format_ambient_summary(
-                self.settings_form.ambient_value,
-                self.settings_form.solfeggio_value,
+                self.settings_form.ambient_sources,
                 volume,
             )
         )
 
     def _stop_runtime_ambient(self) -> None:
         self.ambient_var.set("关闭")
+        self.ambient_texture_var.set("关闭")
         self.solfeggio_var.set("关闭")
         self._apply_runtime_ambient()
 
@@ -561,8 +563,7 @@ class CountdownApp:
     def _refresh_runtime_ambient_summary(self) -> None:
         self.runtime_view.set_ambient_summary(
             format_ambient_summary(
-                self.settings_form.ambient_value,
-                self.settings_form.solfeggio_value,
+                self.settings_form.ambient_sources,
                 round(self.ambient_volume_var.get()),
             )
         )
@@ -629,15 +630,21 @@ class CountdownApp:
         self.floating_status.set_enabled(self.app_settings.floating_status_enabled)
         self.floating_status.begin_session()
         self._play_ambient_selection(
-            self.app_settings.ambient_choice,
-            self.app_settings.solfeggio_choice,
+            tuple(
+                source
+                for source in (
+                    self.app_settings.ambient_choice,
+                    self.app_settings.ambient_texture_choice,
+                    self.app_settings.solfeggio_choice,
+                )
+                if source != "off"
+            ),
             self.app_settings.ambient_volume / 100.0,
         )
         self.settings_view.hide()
         self.break_prompt_view.hide()
         ambient_summary = format_ambient_summary(
-            self.settings_form.ambient_value,
-            self.settings_form.solfeggio_value,
+            self.settings_form.ambient_sources,
             round(self.ambient_volume_var.get()),
         )
         self.runtime_view.show_focus(ambient_summary)

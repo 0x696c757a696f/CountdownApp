@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import math
 from typing import TypeVar
@@ -16,6 +16,9 @@ AMBIENT_NAMES = {
     "pink": "粉红噪音",
     "brown": "棕噪音",
     "grey": "灰噪音",
+    "texture:speech": "语音遮蔽",
+    "texture:rain": "柔和雨声",
+    "texture:airflow": "风扇气流",
 }
 
 
@@ -94,12 +97,15 @@ def scroll_fraction_to_reveal(
     return min(1.0, max(0.0, (target_y - margin) / content_height))
 
 
-def format_ambient_summary(noise: str, tone: str, volume: int) -> str:
+def format_ambient_summary(sources: Sequence[str], volume: int) -> str:
     layers: list[str] = []
-    if noise != "off":
-        layers.append(AMBIENT_NAMES.get(noise, noise))
-    if tone.startswith("tone:"):
-        layers.append(f"Solfeggio {tone.removeprefix('tone:')} Hz")
+    for source in sources:
+        if source == "off":
+            continue
+        if source.startswith("tone:"):
+            layers.append(f"Solfeggio {source.removeprefix('tone:')} Hz")
+        else:
+            layers.append(AMBIENT_NAMES.get(source, source))
     if not layers:
         return "已关闭"
     bounded_volume = min(100, max(0, round(volume)))

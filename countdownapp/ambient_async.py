@@ -49,12 +49,11 @@ class AsyncAmbientController:
 
     def request(
         self,
-        noise: str,
-        tone: str,
+        sources: tuple[str, ...],
         volume: float,
         on_complete: Callable[[bool], None] | None = None,
     ) -> None:
-        sources = tuple(source for source in (noise, tone) if source != "off")
+        sources = tuple(source for source in sources if source != "off")
         with self._lock:
             if self._closed:
                 return

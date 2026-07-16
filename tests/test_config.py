@@ -25,6 +25,9 @@ class ConfigStoreTests(unittest.TestCase):
 
         self.assertEqual("0.wav", settings.audio_choice)
         self.assertEqual("1.wav", settings.return_audio_choice)
+        self.assertEqual("off", settings.ambient_choice)
+        self.assertEqual("off", settings.ambient_texture_choice)
+        self.assertEqual("off", settings.solfeggio_choice)
 
     def test_round_trips_complete_session_and_audio_settings(self):
         with tempfile.TemporaryDirectory() as directory:

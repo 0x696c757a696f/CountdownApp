@@ -390,7 +390,7 @@ class SettingsView:
             text="停止",
             command=self._bindings.on_stop_ambient,
         ).grid(row=0, column=3, pady=4)
-        ttk.Label(section, text="环境纹理", style="Form.TLabel").grid(
+        ttk.Label(section, text="环境录音", style="Form.TLabel").grid(
             row=1, column=0, sticky="e", pady=4
         )
         ttk.Combobox(

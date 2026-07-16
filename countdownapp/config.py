@@ -283,7 +283,14 @@ class ConfigStore:
         if not isinstance(data, dict):
             return
         ambient = data.get("ambient")
-        if not isinstance(ambient, dict) or "solfeggio_choice" in ambient:
+        if not isinstance(ambient, dict):
+            return
+        texture = ambient.get("texture_choice")
+        if texture == "texture:rain":
+            ambient["texture_choice"] = "recording:rain"
+        elif texture in {"texture:speech", "texture:airflow"}:
+            ambient["texture_choice"] = "off"
+        if "solfeggio_choice" in ambient:
             return
         choice = ambient.get("choice")
         if isinstance(choice, str) and choice.startswith("tone:"):

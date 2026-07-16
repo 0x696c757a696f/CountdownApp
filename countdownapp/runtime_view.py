@@ -225,7 +225,7 @@ class RuntimeView:
             0, "基础噪音", self._bindings.noise_var, noise_options
         )
         self._ambient_combobox_row(
-            1, "环境纹理", self._bindings.texture_var, texture_options
+            1, "环境录音", self._bindings.texture_var, texture_options
         )
         self._ambient_combobox_row(
             2, "Solfeggio", self._bindings.tone_var, tone_options

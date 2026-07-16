@@ -93,7 +93,7 @@ class SettingsViewTests(unittest.TestCase):
 
         texts = self._texts(self.root)
         self.assertIn("基础噪音", texts)
-        self.assertIn("环境纹理", texts)
+        self.assertIn("环境录音", texts)
         self.assertIn("Solfeggio 频率", texts)
 
     @staticmethod

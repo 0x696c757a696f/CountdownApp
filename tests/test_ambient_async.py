@@ -59,7 +59,7 @@ class AsyncAmbientControllerTests(unittest.TestCase):
 
         controller.request(("pink",), 0.2, completed.append)
         controller.request(
-            ("brown", "texture:rain", "tone:528"),
+            ("brown", "recording:rain", "tone:528"),
             0.35,
             completed.append,
         )
@@ -68,7 +68,7 @@ class AsyncAmbientControllerTests(unittest.TestCase):
         )
         executor.futures[1].complete(
             PreparedAmbient(
-                ("brown", "texture:rain", "tone:528"),
+                ("brown", "recording:rain", "tone:528"),
                 array("h", [2]),
                 44_100,
             )
@@ -77,7 +77,7 @@ class AsyncAmbientControllerTests(unittest.TestCase):
         self.assertEqual(1, len(dispatched))
         dispatched.pop()()
         self.assertEqual(
-            [(("brown", "texture:rain", "tone:528"), 0.35)], played
+            [(("brown", "recording:rain", "tone:528"), 0.35)], played
         )
         self.assertEqual([True], completed)
 

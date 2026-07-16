@@ -47,7 +47,7 @@ class ConfigStoreTests(unittest.TestCase):
                 return_audio_choice="custom",
                 return_custom_audio_path="D:/sounds/return.mp3",
                 ambient_choice="pink",
-                ambient_texture_choice="texture:rain",
+                ambient_texture_choice="recording:rain",
                 solfeggio_choice="tone:639",
                 ambient_volume=23,
                 close_to_tray=False,
@@ -102,6 +102,16 @@ class ConfigStoreTests(unittest.TestCase):
 
             self.assertEqual("off", loaded.ambient_choice)
             self.assertEqual("tone:528", loaded.solfeggio_choice)
+
+    def test_old_synthetic_rain_selection_moves_to_bundled_rain_recording(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            store = ConfigStore(path)
+            store.save(AppSettings(ambient_texture_choice="texture:rain"))
+
+            loaded = store.load()
+
+            self.assertEqual("recording:rain", loaded.ambient_texture_choice)
 
     def test_migrates_the_legacy_custom_audio_path_once(self):
         with tempfile.TemporaryDirectory() as directory:

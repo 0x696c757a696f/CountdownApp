@@ -83,7 +83,7 @@ class SettingsFormStub:
     def ambient_texture_value(self):
         return {
             "关闭": "off",
-            "柔和雨声": "texture:rain",
+            "风雨雷暴": "recording:storm",
         }.get(self.ambient_texture.get(), "off")
 
     @property
@@ -109,7 +109,7 @@ class RuntimeAmbientTests(unittest.TestCase):
         app.app_settings = AppSettings()
         app.focus = SimpleNamespace(state=state)
         app.ambient_var = ValueStub("粉红噪音")
-        app.ambient_texture_var = ValueStub("柔和雨声")
+        app.ambient_texture_var = ValueStub("风雨雷暴")
         app.solfeggio_var = ValueStub("Solfeggio 528 Hz")
         app.settings_form = SettingsFormStub(
             app.ambient_var,
@@ -130,19 +130,19 @@ class RuntimeAmbientTests(unittest.TestCase):
         app._apply_runtime_ambient()
 
         self.assertEqual(
-            [("request", ("pink", "texture:rain", "tone:528"), 0.35)],
+            [("request", ("pink", "recording:storm", "tone:528"), 0.35)],
             app.ambient_tasks.events,
         )
         self.assertEqual([], app.audio.events)
         self.assertEqual("pink", app.app_settings.ambient_choice)
         self.assertEqual(
-            "texture:rain", app.app_settings.ambient_texture_choice
+            "recording:storm", app.app_settings.ambient_texture_choice
         )
         self.assertEqual("tone:528", app.app_settings.solfeggio_choice)
         self.assertEqual(35, app.app_settings.ambient_volume)
         self.assertEqual([app.app_settings], app.store.saved)
         self.assertEqual(
-            "粉红噪音 + 柔和雨声 + Solfeggio 528 Hz · 35%",
+            "粉红噪音 + 风雨雷暴 + Solfeggio 528 Hz · 35%",
             app.runtime_summary.get(),
         )
 

@@ -16,9 +16,8 @@ AMBIENT_NAMES = {
     "pink": "粉红噪音",
     "brown": "棕噪音",
     "grey": "灰噪音",
-    "texture:speech": "语音遮蔽",
-    "texture:rain": "柔和雨声",
-    "texture:airflow": "风扇气流",
+    "recording:storm": "风雨雷暴",
+    "recording:rain": "雨声",
 }
 
 

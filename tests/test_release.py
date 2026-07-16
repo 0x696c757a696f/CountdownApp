@@ -28,6 +28,14 @@ class ReleaseMetadataTests(unittest.TestCase):
         ):
             self.assertIn(f'"{module}"', spec)
 
+    def test_spec_bundles_both_environment_recordings(self):
+        project_root = Path(__file__).resolve().parents[1]
+        spec = (project_root / "countdown_app.spec").read_text(encoding="utf-8")
+
+        for filename in ("ambient_storm.ogg", "ambient_rain.ogg"):
+            self.assertTrue((project_root / filename).is_file())
+            self.assertIn(f'root / "{filename}"', spec)
+
     def test_package_and_windows_resource_versions_match(self):
         project_root = Path(__file__).resolve().parents[1]
         version_resource = (project_root / "version_info.txt").read_text(

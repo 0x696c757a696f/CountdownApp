@@ -4,39 +4,16 @@ from countdownapp.ambient import synthesize_mix, synthesize_mono
 
 
 class AmbientSynthesisTests(unittest.TestCase):
-    def test_environment_textures_are_bounded_distinct_and_deterministic(self):
-        kinds = ("texture:speech", "texture:rain", "texture:airflow")
-        results = {
-            kind: synthesize_mono(
-                kind, sample_rate=8_000, duration_sec=0.5, seed=42
-            )
-            for kind in kinds
-        }
-
-        for samples in results.values():
-            self.assertEqual(4_000, len(samples))
-            self.assertLessEqual(max(abs(value) for value in samples), 32_767)
-        self.assertEqual(
-            results["texture:rain"].tolist(),
-            synthesize_mono(
-                "texture:rain", sample_rate=8_000, duration_sec=0.5, seed=42
-            ).tolist(),
-        )
-        self.assertEqual(3, len({tuple(samples) for samples in results.values()}))
-        roughness = {
-            kind: sum(
-                abs(current - previous)
-                for previous, current in zip(samples, samples[1:])
-            )
-            / (len(samples) - 1)
-            for kind, samples in results.items()
-        }
-        self.assertLess(
-            roughness["texture:airflow"], roughness["texture:rain"]
-        )
-        self.assertLess(
-            roughness["texture:rain"], roughness["texture:speech"]
-        )
+    def test_recorded_textures_cannot_fall_back_to_noise_synthesis(self):
+        for kind in (
+            "recording:storm",
+            "recording:rain",
+            "texture:speech",
+            "texture:rain",
+            "texture:airflow",
+        ):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                synthesize_mono(kind, sample_rate=8_000, duration_sec=0.5, seed=42)
 
     def test_noise_and_tone_can_be_synthesized_as_a_bounded_mix(self):
         noise = synthesize_mono(

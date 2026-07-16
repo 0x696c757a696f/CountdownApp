@@ -14,7 +14,7 @@ class RuntimeViewTests(unittest.TestCase):
         self.root.geometry("+10000+10000")
         self.bindings = RuntimeBindings(
             noise_var=tk.StringVar(value="粉红噪音"),
-            texture_var=tk.StringVar(value="柔和雨声"),
+            texture_var=tk.StringVar(value="风雨雷暴"),
             tone_var=tk.StringVar(value="关闭"),
             volume_var=tk.DoubleVar(value=20),
             volume_label_var=tk.StringVar(value="20%"),
@@ -30,7 +30,7 @@ class RuntimeViewTests(unittest.TestCase):
             self.root,
             self.bindings,
             noise_options=("关闭", "粉红噪音"),
-            texture_options=("关闭", "柔和雨声"),
+            texture_options=("关闭", "风雨雷暴", "雨声"),
             tone_options=("关闭", "Solfeggio 528 Hz"),
         )
 
@@ -59,13 +59,13 @@ class RuntimeViewTests(unittest.TestCase):
         self.assertIn("粉红噪音 · 20%", self._texts(self.root))
 
     def test_expanded_controls_offer_three_combinable_layers(self):
-        self.view.show_focus("粉红噪音 + 柔和雨声 · 20%")
+        self.view.show_focus("粉红噪音 + 风雨雷暴 · 20%")
         self.view.toggle_ambient_controls()
         self.root.update_idletasks()
 
         texts = self._texts(self.root)
         self.assertIn("基础噪音", texts)
-        self.assertIn("环境纹理", texts)
+        self.assertIn("环境录音", texts)
         self.assertIn("Solfeggio", texts)
 
 

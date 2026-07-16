@@ -1,8 +1,62 @@
 import unittest
 from array import array
+import math
+from pathlib import Path
+from types import SimpleNamespace
 
 from countdownapp.ambient_async import PreparedAmbient
-from countdownapp.audio import AudioEngine, should_play_return_bell
+from countdownapp.audio import (
+    AudioEngine,
+    PygameUnifiedAudioBackend,
+    should_play_return_bell,
+)
+
+
+class FakeChannel:
+    def __init__(self):
+        self.events = []
+
+    def set_volume(self, volume):
+        self.events.append(("volume", volume))
+
+    def pause(self):
+        self.events.append(("pause",))
+
+    def unpause(self):
+        self.events.append(("unpause",))
+
+    def stop(self):
+        self.events.append(("stop",))
+
+
+class FakeSound:
+    def __init__(self, source):
+        self.source = source
+        self.channel = FakeChannel()
+
+    def play(self, *, loops, fade_ms):
+        self.channel.events.append(("play", loops, fade_ms))
+        return self.channel
+
+
+class FakeMixer:
+    def __init__(self):
+        self.sounds = []
+        self.music = SimpleNamespace(load=lambda _path: None, play=lambda: None, stop=lambda: None)
+
+    def get_init(self):
+        return (44_100, -16, 2)
+
+    def init(self, **_kwargs):
+        return None
+
+    def Sound(self, source=None, *, buffer=None):
+        sound = FakeSound(source if source is not None else buffer)
+        self.sounds.append(sound)
+        return sound
+
+    def quit(self):
+        return None
 
 
 class RecordingEngineBackend:
@@ -70,6 +124,33 @@ class RecordingEngineBackend:
 
 
 class AudioEngineTests(unittest.TestCase):
+    def test_generated_mix_and_bundled_recording_loop_on_separate_channels(self):
+        mixer = FakeMixer()
+        backend = PygameUnifiedAudioBackend(
+            pygame_module=SimpleNamespace(mixer=mixer)
+        )
+        prepared = PreparedAmbient(
+            ("pink", "recording:storm"),
+            array("h", [10, -10]),
+            44_100,
+            (Path("ambient_storm.ogg"),),
+        )
+
+        backend.play_prepared_ambient(prepared, 0.3)
+        backend.pause_ambient()
+        backend.resume_ambient()
+
+        self.assertEqual(2, len(mixer.sounds))
+        self.assertIsInstance(mixer.sounds[0].source, bytes)
+        self.assertEqual("ambient_storm.ogg", mixer.sounds[1].source)
+        for sound in mixer.sounds:
+            self.assertEqual(("play", -1, 250), sound.channel.events[0])
+            self.assertAlmostEqual(
+                0.3 / math.sqrt(2), sound.channel.events[1][1]
+            )
+            self.assertEqual(("pause",), sound.channel.events[2])
+            self.assertEqual(("unpause",), sound.channel.events[3])
+
     def test_prepared_mix_reaches_the_backend_without_synthesizing_again(self):
         backend = RecordingEngineBackend()
         engine = AudioEngine(backend_factory=lambda: backend)
@@ -97,7 +178,7 @@ class AudioEngineTests(unittest.TestCase):
         backend = RecordingEngineBackend()
         engine = AudioEngine(backend_factory=lambda: backend, ducking_ratio=0.25)
 
-        engine.play_ambient("pink", "tone:528", 0.4)
+        engine.play_ambient(("pink", "tone:528"), 0.4)
         played = engine.play_bell("start.wav")
         engine.stop_bell()
 
@@ -116,7 +197,7 @@ class AudioEngineTests(unittest.TestCase):
     def test_volume_changes_remain_ducked_while_a_bell_is_active(self):
         backend = RecordingEngineBackend()
         engine = AudioEngine(backend_factory=lambda: backend, ducking_ratio=0.25)
-        engine.play_ambient("pink", "off", 0.4)
+        engine.play_ambient(("pink",), 0.4)
         engine.play_bell("start.wav")
 
         engine.set_ambient_volume(0.6)
@@ -135,7 +216,7 @@ class AudioEngineTests(unittest.TestCase):
         backend = RecordingEngineBackend()
         engine = AudioEngine(backend_factory=lambda: backend)
 
-        engine.play_ambient("brown", "off", 0.2)
+        engine.play_ambient(("brown",), 0.2)
         engine.set_ambient_volume(0.3)
         engine.pause_ambient()
         engine.resume_ambient()
@@ -164,7 +245,7 @@ class AudioEngineTests(unittest.TestCase):
             return backend
 
         engine = AudioEngine(backend_factory=factory, ducking_ratio=0.25)
-        engine.play_ambient("pink", "off", 0.4)
+        engine.play_ambient(("pink",), 0.4)
 
         engine.play_bell("start.wav")
         engine.stop_bell()
@@ -196,7 +277,7 @@ class AudioEngineTests(unittest.TestCase):
 
         engine = AudioEngine(backend_factory=factory)
 
-        played = engine.play_ambient("grey", "off", 0.2)
+        played = engine.play_ambient(("grey",), 0.2)
 
         self.assertIs(played, True)
         self.assertEqual(2, len(created))
@@ -210,7 +291,7 @@ class AudioEngineTests(unittest.TestCase):
             backend_factory=lambda: RecordingEngineBackend(fail_ambient=True)
         )
 
-        played = engine.play_ambient("pink", "tone:174", 0.2)
+        played = engine.play_ambient(("pink", "tone:174"), 0.2)
 
         self.assertIs(played, False)
 
@@ -227,7 +308,7 @@ class AudioEngineTests(unittest.TestCase):
             return backend
 
         engine = AudioEngine(backend_factory=factory)
-        engine.play_ambient("pink", "off", 0.2)
+        engine.play_ambient(("pink",), 0.2)
         engine.play_bell("start.wav")
 
         engine.stop_bell()
@@ -250,7 +331,7 @@ class AudioEngineTests(unittest.TestCase):
             return backend
 
         engine = AudioEngine(backend_factory=factory)
-        engine.play_ambient("grey", "off", 0.2)
+        engine.play_ambient(("grey",), 0.2)
 
         engine.set_ambient_volume(0.4)
 
@@ -271,7 +352,7 @@ class AudioEngineTests(unittest.TestCase):
             return backend
 
         engine = AudioEngine(backend_factory=factory)
-        engine.play_ambient("brown", "off", 0.2)
+        engine.play_ambient(("brown",), 0.2)
 
         engine.pause_ambient()
 
@@ -283,12 +364,12 @@ class AudioEngineTests(unittest.TestCase):
             backends[1].events,
         )
 
-    def test_turning_both_ambient_layers_off_stops_the_existing_loop(self):
+    def test_turning_all_ambient_layers_off_stops_the_existing_loop(self):
         backend = RecordingEngineBackend()
         engine = AudioEngine(backend_factory=lambda: backend)
-        engine.play_ambient("white", "off", 0.2)
+        engine.play_ambient(("white",), 0.2)
 
-        engine.play_ambient("off", "off", 0.2)
+        engine.play_ambient((), 0.2)
 
         self.assertEqual(("stop_ambient",), backend.events[-1])
 
@@ -328,7 +409,7 @@ class AudioEngineTests(unittest.TestCase):
             backend_factory=factory,
             fallback=lambda: fallbacks.append(True),
         )
-        engine.play_ambient("brown", "off", 0.2)
+        engine.play_ambient(("brown",), 0.2)
 
         played = engine.play_bell("missing.mp3")
 

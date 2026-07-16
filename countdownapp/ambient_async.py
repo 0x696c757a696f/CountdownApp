@@ -3,19 +3,10 @@ from __future__ import annotations
 import logging
 import secrets
 import threading
-from array import array
 from collections.abc import Callable
 from concurrent.futures import Executor, Future, ThreadPoolExecutor
-from dataclasses import dataclass
 
-from .ambient import synthesize_mix
-
-
-@dataclass(frozen=True)
-class PreparedAmbient:
-    sources: tuple[str, ...]
-    samples: array
-    sample_rate: int
+from .ambient_library import PreparedAmbient, prepare_ambient
 
 
 class AsyncAmbientController:
@@ -145,10 +136,9 @@ class AsyncAmbientController:
 
     @classmethod
     def _render(cls, sources: tuple[str, ...]) -> PreparedAmbient:
-        samples = synthesize_mix(
+        return prepare_ambient(
             sources,
             sample_rate=cls.SAMPLE_RATE,
             duration_sec=cls.DURATION_SEC,
             seed=secrets.randbits(64),
         )
-        return PreparedAmbient(sources, samples, cls.SAMPLE_RATE)

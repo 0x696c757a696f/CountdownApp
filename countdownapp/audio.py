@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import logging
+import math
 import secrets
 import winsound
 from array import array
 from pathlib import Path
 from typing import Callable, Protocol
 
-from .ambient import synthesize_mix
-from .ambient_async import PreparedAmbient
+from .ambient_library import PreparedAmbient, prepare_ambient
 
 
 def should_play_return_bell(
@@ -53,8 +53,8 @@ class AudioEngine:
         self._ambient_paused = False
         self._bell_active = False
 
-    def play_ambient(self, noise: str, tone: str, volume: float) -> bool:
-        sources = tuple(source for source in (noise, tone) if source != "off")
+    def play_ambient(self, sources: tuple[str, ...], volume: float) -> bool:
+        sources = tuple(source for source in sources if source != "off")
         if not sources:
             self.stop_ambient()
             return True
@@ -232,17 +232,20 @@ class AudioEngine:
 class PygameUnifiedAudioBackend:
     """Owns pygame's global mixer and keeps bells on a channel separate from ambience."""
 
-    def __init__(self) -> None:
-        import pygame
+    def __init__(self, pygame_module=None) -> None:
+        if pygame_module is None:
+            import pygame
+        else:
+            pygame = pygame_module
 
         self._pygame = pygame
         if not pygame.mixer.get_init():
             pygame.mixer.init(frequency=44_100, size=-16, channels=2)
-        self._ambient_sound = None
-        self._ambient_channel = None
+        self._ambient_sounds: list[object] = []
+        self._ambient_channels: list[object] = []
         self._ambient_sources: tuple[str, ...] = ()
         self._ambient_volume = 0.2
-        self._ambient_cache: dict[tuple[tuple[str, ...], int, int], object] = {}
+        self._ambient_cache: dict[tuple[object, ...], object] = {}
 
     def play_bell(self, path: str | Path) -> None:
         source = Path(path)
@@ -260,15 +263,11 @@ class PygameUnifiedAudioBackend:
         if mixer_settings is None:
             raise RuntimeError("Audio mixer is not initialized")
         sample_rate, _sample_format, _channels = mixer_settings
-        prepared = PreparedAmbient(
+        prepared = prepare_ambient(
             sources,
-            synthesize_mix(
-                sources,
-                sample_rate=sample_rate,
-                duration_sec=2.0,
-                seed=secrets.randbits(64),
-            ),
-            sample_rate,
+            sample_rate=sample_rate,
+            duration_sec=2.0,
+            seed=secrets.randbits(64),
         )
         self.play_prepared_ambient(prepared, volume)
 
@@ -278,60 +277,84 @@ class PygameUnifiedAudioBackend:
         self._ambient_volume = min(1.0, max(0.0, float(volume)))
         if (
             self._ambient_sources == prepared.sources
-            and self._ambient_channel is not None
+            and self._ambient_channels
         ):
-            self._ambient_channel.set_volume(self._ambient_volume)
-            self._ambient_channel.unpause()
+            effective_volume = self._channel_volume(len(self._ambient_channels))
+            for channel in self._ambient_channels:
+                channel.set_volume(effective_volume)
+                channel.unpause()
             return
 
         mixer_settings = self._pygame.mixer.get_init()
         if mixer_settings is None:
             raise RuntimeError("Audio mixer is not initialized")
         sample_rate, sample_format, channels = mixer_settings
-        if sample_format != -16:
+        if prepared.samples and sample_format != -16:
             raise RuntimeError("Ambient sound requires a signed 16-bit audio mixer")
-        if sample_rate != prepared.sample_rate:
+        if prepared.samples and sample_rate != prepared.sample_rate:
             raise RuntimeError("Prepared ambient sample rate does not match the mixer")
-        cache_key = (prepared.sources, sample_rate, channels)
-        sound = self._ambient_cache.get(cache_key)
-        if sound is None:
-            pcm = prepared.samples if channels == 1 else array(
-                "h",
-                (
-                    sample
-                    for value in prepared.samples
-                    for sample in (value,) * channels
-                ),
-            )
-            sound = self._pygame.mixer.Sound(buffer=pcm.tobytes())
-            self._ambient_cache[cache_key] = sound
+        sounds: list[object] = []
+        if prepared.samples:
+            cache_key = ("generated", prepared.sources, sample_rate, channels)
+            sound = self._ambient_cache.get(cache_key)
+            if sound is None:
+                pcm = prepared.samples if channels == 1 else array(
+                    "h",
+                    (
+                        sample
+                        for value in prepared.samples
+                        for sample in (value,) * channels
+                    ),
+                )
+                sound = self._pygame.mixer.Sound(buffer=pcm.tobytes())
+                self._ambient_cache[cache_key] = sound
+            sounds.append(sound)
+        for path in prepared.recording_paths:
+            cache_key = ("recording", str(path))
+            sound = self._ambient_cache.get(cache_key)
+            if sound is None:
+                sound = self._pygame.mixer.Sound(str(path))
+                self._ambient_cache[cache_key] = sound
+            sounds.append(sound)
 
         self.stop_ambient()
-        self._ambient_sound = sound
-        self._ambient_channel = sound.play(loops=-1, fade_ms=250)
-        if self._ambient_channel is None:
-            raise RuntimeError("No free audio channel is available")
-        self._ambient_channel.set_volume(self._ambient_volume)
+        self._ambient_sounds = sounds
+        try:
+            effective_volume = self._channel_volume(len(sounds))
+            for sound in sounds:
+                channel = sound.play(loops=-1, fade_ms=250)
+                if channel is None:
+                    raise RuntimeError("No free audio channel is available")
+                channel.set_volume(effective_volume)
+                self._ambient_channels.append(channel)
+        except Exception:
+            self.stop_ambient()
+            raise
         self._ambient_sources = prepared.sources
 
     def set_ambient_volume(self, volume: float) -> None:
         self._ambient_volume = min(1.0, max(0.0, float(volume)))
-        if self._ambient_channel is not None:
-            self._ambient_channel.set_volume(self._ambient_volume)
+        effective_volume = self._channel_volume(len(self._ambient_channels))
+        for channel in self._ambient_channels:
+            channel.set_volume(effective_volume)
+
+    def _channel_volume(self, channel_count: int) -> float:
+        """Keep combined layers near the requested total power without clipping."""
+        return self._ambient_volume / math.sqrt(max(1, channel_count))
 
     def pause_ambient(self) -> None:
-        if self._ambient_channel is not None:
-            self._ambient_channel.pause()
+        for channel in self._ambient_channels:
+            channel.pause()
 
     def resume_ambient(self) -> None:
-        if self._ambient_channel is not None:
-            self._ambient_channel.unpause()
+        for channel in self._ambient_channels:
+            channel.unpause()
 
     def stop_ambient(self) -> None:
-        if self._ambient_channel is not None:
-            self._ambient_channel.stop()
-        self._ambient_channel = None
-        self._ambient_sound = None
+        for channel in self._ambient_channels:
+            channel.stop()
+        self._ambient_channels.clear()
+        self._ambient_sounds.clear()
         self._ambient_sources = ()
 
     def close(self) -> None:

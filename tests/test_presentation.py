@@ -73,9 +73,9 @@ class FeedbackSummaryTests(unittest.TestCase):
 class AmbientSummaryTests(unittest.TestCase):
     def test_summarizes_a_runtime_background_audio_mix(self):
         self.assertEqual(
-            "粉红噪音 + 柔和雨声 + Solfeggio 528 Hz · 20%",
+            "粉红噪音 + 风雨雷暴 + Solfeggio 528 Hz · 20%",
             format_ambient_summary(
-                ("pink", "texture:rain", "tone:528"), 20
+                ("pink", "recording:storm", "tone:528"), 20
             ),
         )
         self.assertEqual("已关闭", format_ambient_summary(("off",), 20))

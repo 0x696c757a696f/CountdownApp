@@ -35,9 +35,8 @@ NOISE_OPTIONS = {
 
 AMBIENT_TEXTURE_OPTIONS = {
     "关闭": "off",
-    "语音遮蔽（降低人声干扰）": "texture:speech",
-    "柔和雨声": "texture:rain",
-    "风扇气流": "texture:airflow",
+    "风雨雷暴": "recording:storm",
+    "雨声": "recording:rain",
 }
 
 SOLFEGGIO_OPTIONS = {

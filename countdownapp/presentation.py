@@ -51,6 +51,11 @@ def _scaled(value: int, ui_scale: float) -> int:
     return max(1, round(value * max(1.0, ui_scale)))
 
 
+def scaled_scrollbar_width(ui_scale: float) -> int:
+    """Return a scrollbar width that remains easy to grab on scaled displays."""
+    return max(18, _scaled(16, ui_scale))
+
+
 def responsive_window_layout(
     screen_width: int,
     screen_height: int,

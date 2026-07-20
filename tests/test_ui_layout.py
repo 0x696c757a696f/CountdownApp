@@ -63,6 +63,18 @@ class SettingsActionLayoutTests(unittest.TestCase):
 
         self.assertLessEqual(action_bottom, viewport_bottom)
 
+    def test_primary_numeric_fields_stay_compact_in_a_wide_window(self):
+        self.root.geometry("1100x710+80+80")
+        self.root.update()
+        fields = [
+            widget
+            for widget in self._descendants(self.app.settings_view.frame)
+            if isinstance(widget, ttk.Entry) and widget.winfo_ismapped()
+        ]
+
+        self.assertTrue(fields)
+        self.assertLessEqual(max(field.winfo_width() for field in fields), 320)
+
     def test_more_settings_action_remains_visible_in_classic_mode(self):
         self.app.algorithm_var.set("Classic")
         self.app.settings_view.refresh_algorithm()

@@ -37,6 +37,7 @@ from .logging_config import configure_logging
 from .presentation import (
     format_ambient_summary,
     responsive_window_layout,
+    scaled_scrollbar_width,
     window_ui_scale,
 )
 from .resources import install_dir, resource_path
@@ -252,6 +253,12 @@ class CountdownApp:
         )
         style.configure("TEntry", font=("Microsoft YaHei UI", 10), padding=5)
         style.configure("TCombobox", font=("Microsoft YaHei UI", 10), padding=4)
+        scrollbar_width = scaled_scrollbar_width(window_ui_scale(self.root))
+        style.configure(
+            "App.Vertical.TScrollbar",
+            width=scrollbar_width,
+            arrowsize=scrollbar_width,
+        )
 
     def _build_ui(self) -> None:
         self.settings_form = SettingsForm(self.root)

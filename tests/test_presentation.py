@@ -8,6 +8,7 @@ from countdownapp.presentation import (
     format_reminder_status,
     responsive_window_layout,
     runtime_window_layout,
+    scaled_scrollbar_width,
     scroll_fraction_to_reveal,
     v2_window_layout,
     window_ui_scale,
@@ -83,6 +84,10 @@ class AmbientSummaryTests(unittest.TestCase):
 
 
 class ResponsiveWindowLayoutTests(unittest.TestCase):
+    def test_scrollbar_stays_easy_to_grab_at_high_dpi(self):
+        self.assertEqual(18, scaled_scrollbar_width(1.0))
+        self.assertEqual(28, scaled_scrollbar_width(1.75))
+
     def test_high_dpi_scales_width_and_uses_measured_content_height(self):
         layout = responsive_window_layout(
             2560,

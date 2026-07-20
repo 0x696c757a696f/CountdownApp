@@ -178,7 +178,10 @@ class SettingsView:
             highlightthickness=0,
         )
         scrollbar = ttk.Scrollbar(
-            self.frame, orient="vertical", command=self._canvas.yview
+            self.frame,
+            orient="vertical",
+            command=self._canvas.yview,
+            style="App.Vertical.TScrollbar",
         )
         self._canvas.configure(yscrollcommand=scrollbar.set)
         self._canvas.grid(row=2, column=0, sticky="nsew")
@@ -206,7 +209,9 @@ class SettingsView:
 
         form = ttk.Frame(self._content, padding=(32, 14), style="Form.TFrame")
         form.grid(row=0, column=0, sticky="ew", padx=8)
-        form.columnconfigure(1, weight=1)
+        # Numeric values need only a compact field. Keep the remaining card width
+        # as a spacer so units stay beside their field while footer actions align right.
+        form.columnconfigure(3, weight=1)
         self._build_core_options(form)
         self._build_more_settings(form)
 
@@ -257,7 +262,7 @@ class SettingsView:
         )
         self._entry_row(parent, 5, "微休息时间", self._form.microbreak, "秒")
         ttk.Separator(parent).grid(
-            row=6, column=0, columnspan=3, sticky="ew", pady=12
+            row=6, column=0, columnspan=4, sticky="ew", pady=12
         )
         self._entry_row(parent, 7, "大休息时间", self._form.long_break, "分钟")
         ttk.Label(parent, text="休息倒计时", style="Form.TLabel").grid(
@@ -270,7 +275,7 @@ class SettingsView:
             style="Form.TCheckbutton",
         ).grid(row=8, column=1, columnspan=2, sticky="w", padx=(12, 0), pady=7)
         ttk.Separator(parent).grid(
-            row=9, column=0, columnspan=3, sticky="ew", pady=12
+            row=9, column=0, columnspan=4, sticky="ew", pady=12
         )
 
         self._v2_summary_label = ttk.Label(
@@ -284,7 +289,7 @@ class SettingsView:
             row=10, column=0, columnspan=2, sticky="w", pady=5
         )
         self._settings_actions = ttk.Frame(parent, style="Form.TFrame")
-        self._settings_actions.grid(row=10, column=2, sticky="e", pady=5)
+        self._settings_actions.grid(row=10, column=3, sticky="e", pady=5)
         self._v2_button = ttk.Button(
             self._settings_actions,
             text="调整 V2",
@@ -583,7 +588,7 @@ class SettingsView:
     def _toggle_more_settings(self) -> None:
         self._more_expanded = not self._more_expanded
         if self._more_expanded:
-            self._more_frame.grid(row=11, column=0, columnspan=3, sticky="ew")
+            self._more_frame.grid(row=11, column=0, columnspan=4, sticky="ew")
             self._more_button.config(text="收起更多设置 ▴")
             self._root.after_idle(self._reveal_more_settings)
         else:

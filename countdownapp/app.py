@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 from . import __version__
 from .adaptive import AttentionFeedback
 from .ambient_async import AsyncAmbientController
-from .app_icon import apply_window_icon
+from .app_icon import apply_window_icon, configure_process_identity
 from .audio import AudioEngine, should_play_return_bell
 from .break_prompt_view import BreakPromptBindings, BreakPromptView
 from .config import AppSettings, ConfigStore
@@ -1011,6 +1011,10 @@ def run() -> None:
     logger = configure_logging()
     root: tk.Tk | None = None
     try:
+        try:
+            configure_process_identity()
+        except OSError as error:
+            logger.warning("Setting Windows application identity failed: %s", error)
         root = tk.Tk()
 
         def report_callback_exception(

@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from countdownapp.app_icon import apply_window_icon
+from countdownapp.app_icon import apply_window_icon, configure_process_identity
 
 
 class RootStub:
@@ -11,11 +11,22 @@ class RootStub:
     def iconphoto(self, default, image):
         self.events.append(("iconphoto", default, image))
 
-    def iconbitmap(self, *, default):
-        self.events.append(("iconbitmap", default))
+    def iconbitmap(self, *, bitmap):
+        self.events.append(("iconbitmap", bitmap))
 
 
 class AppIconTests(unittest.TestCase):
+    def test_windows_process_uses_a_stable_taskbar_identity(self):
+        app_ids = []
+
+        configured = configure_process_identity(
+            platform_name="win32",
+            setter=app_ids.append,
+        )
+
+        self.assertTrue(configured)
+        self.assertEqual(["CountdownApp.FocusTimer"], app_ids)
+
     def test_one_icon_family_is_applied_to_the_root_and_child_windows(self):
         root = RootStub()
         photo = object()

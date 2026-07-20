@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from tkinter import ttk
 
-from .presentation import RenderCache, runtime_window_layout
+from .presentation import RenderCache, runtime_window_layout, window_ui_scale
 
 
 @dataclass(frozen=True)
@@ -133,10 +133,13 @@ class RuntimeView:
         self._ambient_controls_expanded = False
 
     def apply_window_layout(self) -> None:
+        self._root.update_idletasks()
         layout = runtime_window_layout(
             self._root.winfo_screenwidth(),
             self._root.winfo_screenheight(),
             controls_expanded=self._ambient_controls_expanded,
+            minimum_content_height=self.required_height,
+            ui_scale=window_ui_scale(self._root),
         )
         self._root.minsize(layout.min_width, layout.min_height)
         self._root.geometry(layout.geometry)

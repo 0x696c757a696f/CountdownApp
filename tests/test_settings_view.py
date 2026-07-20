@@ -81,6 +81,20 @@ class SettingsViewTests(unittest.TestCase):
 
         self.bindings.on_start_focus.assert_called_once_with()
 
+    def test_required_height_includes_content_hidden_by_the_canvas_request(self):
+        self.view.show()
+        self.root.update_idletasks()
+
+        hidden_content = max(
+            0,
+            self.view._content.winfo_reqheight()
+            - self.view._canvas.winfo_reqheight(),
+        )
+        self.assertEqual(
+            self.view.frame.winfo_reqheight() + hidden_content,
+            self.view.required_height,
+        )
+
     def test_background_audio_groups_three_combinable_layers(self):
         self.view.show()
         more = next(

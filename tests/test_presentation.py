@@ -10,6 +10,7 @@ from countdownapp.presentation import (
     runtime_window_layout,
     scroll_fraction_to_reveal,
     v2_window_layout,
+    window_ui_scale,
 )
 
 
@@ -82,6 +83,29 @@ class AmbientSummaryTests(unittest.TestCase):
 
 
 class ResponsiveWindowLayoutTests(unittest.TestCase):
+    def test_high_dpi_scales_width_and_uses_measured_content_height(self):
+        layout = responsive_window_layout(
+            2560,
+            1600,
+            ui_scale=1.75,
+            minimum_content_height=731,
+        )
+
+        self.assertEqual((1260, 731), (layout.width, layout.height))
+        self.assertEqual((1120, 540), (layout.min_width, layout.min_height))
+        self.assertEqual((650, 434), (layout.x, layout.y))
+
+    def test_reads_the_tk_display_scale_relative_to_96_dpi(self):
+        class WindowStub:
+            def winfo_fpixels(self, value):
+                self.requested = value
+                return 168
+
+        window = WindowStub()
+
+        self.assertEqual(1.75, window_ui_scale(window))
+        self.assertEqual("1i", window.requested)
+
     def test_leaves_vertical_room_around_the_window(self):
         layout = responsive_window_layout(1463, 914)
 

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter import ttk
 
-from .presentation import runtime_window_layout
+from .presentation import runtime_window_layout, window_ui_scale
 
 
 @dataclass(frozen=True)
@@ -47,6 +47,7 @@ class BreakPromptView:
             self._root.winfo_screenheight(),
             controls_expanded=False,
             minimum_content_height=self.required_height,
+            ui_scale=window_ui_scale(self._root),
         )
         self._root.minsize(layout.min_width, layout.min_height)
         self._root.geometry(layout.geometry)

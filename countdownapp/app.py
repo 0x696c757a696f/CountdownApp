@@ -37,6 +37,7 @@ from .logging_config import configure_logging
 from .presentation import (
     format_ambient_summary,
     responsive_window_layout,
+    window_ui_scale,
 )
 from .resources import install_dir, resource_path
 from .reminder_view import (
@@ -173,7 +174,9 @@ class CountdownApp:
     def _configure_root(self) -> None:
         self.root.title("CountdownApp V2")
         window_layout = responsive_window_layout(
-            self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            self.root.winfo_screenwidth(),
+            self.root.winfo_screenheight(),
+            ui_scale=window_ui_scale(self.root),
         )
         self.root.geometry(window_layout.geometry)
         self.root.minsize(window_layout.min_width, window_layout.min_height)

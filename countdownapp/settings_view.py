@@ -5,7 +5,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter import ttk
 
-from .presentation import responsive_window_layout, scroll_fraction_to_reveal
+from .presentation import (
+    responsive_window_layout,
+    scroll_fraction_to_reveal,
+    window_ui_scale,
+)
 from .reminder_view import FLOW_FEEDBACK_LABEL
 from .settings_form import (
     AMBIENT_TEXTURE_OPTIONS,
@@ -85,12 +89,21 @@ class SettingsView:
         return self._more_expanded
 
     @property
+    def required_height(self) -> int:
+        hidden_content = max(
+            0,
+            self._content.winfo_reqheight() - self._canvas.winfo_reqheight(),
+        )
+        return self.frame.winfo_reqheight() + hidden_content
+
+    @property
     def startup_mode(self) -> StartupMode:
         return STARTUP_OPTIONS.get(self._startup_var.get(), StartupMode.OFF)
 
     def show(self) -> None:
         self.frame.pack(fill="both", expand=True)
         self.apply_window_layout()
+        self._root.after_idle(self.apply_window_layout)
 
     def hide(self) -> None:
         self.frame.pack_forget()
@@ -132,11 +145,18 @@ class SettingsView:
         self.refresh_algorithm()
 
     def apply_window_layout(self) -> None:
-        layout = responsive_window_layout(
-            self._root.winfo_screenwidth(), self._root.winfo_screenheight()
-        )
-        self._root.minsize(layout.min_width, layout.min_height)
-        self._root.geometry(layout.geometry)
+        # The canvas recalculates its viewport after each geometry change.
+        # A few bounded passes converge on the complete height without padding.
+        for _pass in range(3):
+            self._root.update_idletasks()
+            layout = responsive_window_layout(
+                self._root.winfo_screenwidth(),
+                self._root.winfo_screenheight(),
+                ui_scale=window_ui_scale(self._root),
+                minimum_content_height=self.required_height,
+            )
+            self._root.minsize(layout.min_width, layout.min_height)
+            self._root.geometry(layout.geometry)
 
     def _build_header(self) -> None:
         ttk.Label(self.frame, text="CountdownApp V2", style="Title.TLabel").grid(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 import math
-from typing import TypeVar
+from typing import Protocol, TypeVar
 
 from .adaptive import FeedbackSummary
 
@@ -35,28 +35,62 @@ class WindowLayout:
         return f"{self.width}x{self.height}+{self.x}+{self.y}"
 
 
-def responsive_window_layout(screen_width: int, screen_height: int) -> WindowLayout:
+class ScaledWindow(Protocol):
+    def winfo_fpixels(self, value: str) -> float: ...
+
+
+def window_ui_scale(window: ScaledWindow) -> float:
+    """Return the physical-pixel scale used by a DPI-aware Tk window."""
+    try:
+        return max(1.0, float(window.winfo_fpixels("1i")) / 96.0)
+    except (AttributeError, TypeError, ValueError):
+        return 1.0
+
+
+def _scaled(value: int, ui_scale: float) -> int:
+    return max(1, round(value * max(1.0, ui_scale)))
+
+
+def responsive_window_layout(
+    screen_width: int,
+    screen_height: int,
+    *,
+    ui_scale: float = 1.0,
+    minimum_content_height: int = 0,
+) -> WindowLayout:
     """Size and center the settings window without crowding the display edges."""
-    width = min(720, max(1, screen_width - 80))
-    height = min(690, max(1, screen_height - 140))
+    width = min(_scaled(720, ui_scale), max(1, screen_width - _scaled(80, ui_scale)))
+    height = min(
+        max(690, max(0, minimum_content_height)),
+        max(1, screen_height - _scaled(140, ui_scale)),
+    )
     return WindowLayout(
         width=width,
         height=height,
-        min_width=min(640, width),
+        min_width=min(_scaled(640, ui_scale), width),
         min_height=min(540, height),
         x=max(0, (screen_width - width) // 2),
         y=max(0, (screen_height - height) // 2),
     )
 
 
-def v2_window_layout(screen_width: int, screen_height: int) -> WindowLayout:
+def v2_window_layout(
+    screen_width: int,
+    screen_height: int,
+    *,
+    ui_scale: float = 1.0,
+    minimum_content_height: int = 0,
+) -> WindowLayout:
     """Size the V2 editor around its two compact settings groups."""
-    width = min(560, max(1, screen_width - 80))
-    height = min(430, max(1, screen_height - 100))
+    width = min(_scaled(560, ui_scale), max(1, screen_width - _scaled(80, ui_scale)))
+    height = min(
+        max(430, max(0, minimum_content_height)),
+        max(1, screen_height - _scaled(100, ui_scale)),
+    )
     return WindowLayout(
         width=width,
         height=height,
-        min_width=min(540, width),
+        min_width=min(_scaled(540, ui_scale), width),
         min_height=min(410, height),
         x=max(0, (screen_width - width) // 2),
         y=max(0, (screen_height - height) // 2),
@@ -69,13 +103,17 @@ def runtime_window_layout(
     *,
     controls_expanded: bool,
     minimum_content_height: int = 0,
+    ui_scale: float = 1.0,
 ) -> WindowLayout:
     """Return a compact focus window that grows only for visible audio controls."""
     preferred_height = 460 if controls_expanded else 280
-    width = min(600, max(1, screen_width - 80))
+    width = min(
+        _scaled(600, ui_scale),
+        max(1, screen_width - _scaled(80, ui_scale)),
+    )
     height = min(
         max(preferred_height, max(0, minimum_content_height)),
-        max(1, screen_height - 100),
+        max(1, screen_height - _scaled(100, ui_scale)),
     )
     return WindowLayout(
         width=width,

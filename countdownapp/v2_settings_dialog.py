@@ -4,7 +4,7 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
-from .presentation import v2_window_layout
+from .presentation import v2_window_layout, window_ui_scale
 from .settings_form import SettingsForm
 
 
@@ -45,7 +45,9 @@ class V2SettingsDialog:
         self._window = window
         window.title("V2 节律设置")
         layout = v2_window_layout(
-            window.winfo_screenwidth(), window.winfo_screenheight()
+            window.winfo_screenwidth(),
+            window.winfo_screenheight(),
+            ui_scale=window_ui_scale(window),
         )
         window.geometry(layout.geometry)
         window.minsize(layout.min_width, layout.min_height)
@@ -79,6 +81,15 @@ class V2SettingsDialog:
             style="Primary.TButton",
             command=self.close,
         ).pack(side="left")
+        window.update_idletasks()
+        layout = v2_window_layout(
+            window.winfo_screenwidth(),
+            window.winfo_screenheight(),
+            ui_scale=window_ui_scale(window),
+            minimum_content_height=body.winfo_reqheight(),
+        )
+        window.geometry(layout.geometry)
+        window.minsize(layout.min_width, layout.min_height)
         window.protocol("WM_DELETE_WINDOW", self.close)
 
     def close(self) -> None:

@@ -17,9 +17,10 @@ GREEN = "#62d995"
 WHITE = "#f8fafc"
 
 
-def generate_icon() -> Image.Image:
+def generate_icon(output_size: int = MASTER_SIZE) -> Image.Image:
     size = MASTER_SIZE * RENDER_SCALE
     scale = RENDER_SCALE
+    compact = output_size <= 24
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
@@ -32,12 +33,12 @@ def generate_icon() -> Image.Image:
         start=15,
         end=315,
         fill=BLUE,
-        width=48 * scale,
+        width=(64 if compact else 48) * scale,
     )
 
     center = (244 * scale, 270 * scale)
     hands = ((244, 154), (335, 337))
-    hand_width = 30 * scale
+    hand_width = (58 if compact else 30) * scale
     hand_radius = hand_width // 2
     for target_x, target_y in hands:
         target = (target_x * scale, target_y * scale)
@@ -57,12 +58,17 @@ def generate_icon() -> Image.Image:
     node_x = 256 + round(195 * math.cos(angle))
     node_y = 256 + round(195 * math.sin(angle))
     draw.ellipse(
-        box(node_x - 35, node_y - 35, node_x + 35, node_y + 35),
+        box(
+            node_x - (42 if compact else 35),
+            node_y - (42 if compact else 35),
+            node_x + (42 if compact else 35),
+            node_y + (42 if compact else 35),
+        ),
         fill=GREEN,
     )
 
     return image.resize(
-        (MASTER_SIZE, MASTER_SIZE),
+        (output_size, output_size),
         Image.Resampling.LANCZOS,
     )
 
@@ -70,10 +76,12 @@ def generate_icon() -> Image.Image:
 def main() -> None:
     master = generate_icon()
     master.save(ROOT / "clock_icon.png", optimize=True)
-    master.save(
+    icon_frames = [generate_icon(size) for size in ICO_SIZES]
+    icon_frames[-1].save(
         ROOT / "clock_icon.ico",
         format="ICO",
         sizes=[(size, size) for size in ICO_SIZES],
+        append_images=icon_frames[:-1],
     )
 
 

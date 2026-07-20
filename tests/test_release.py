@@ -45,6 +45,12 @@ class ReleaseMetadataTests(unittest.TestCase):
                  (64, 64), (128, 128), (256, 256)},
                 icon.info["sizes"],
             )
+            smallest = icon.ico.getimage((16, 16)).convert("RGBA")
+            visible_hand_pixels = sum(
+                alpha >= 220 and red >= 220 and green >= 220 and blue >= 220
+                for red, green, blue, alpha in smallest.getdata()
+            )
+            self.assertGreaterEqual(visible_hand_pixels, 6)
 
     def test_spec_bundles_both_environment_recordings(self):
         project_root = Path(__file__).resolve().parents[1]

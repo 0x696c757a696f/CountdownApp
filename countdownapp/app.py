@@ -15,7 +15,11 @@ from tkinter import filedialog, messagebox, ttk
 from . import __version__
 from .adaptive import AttentionFeedback
 from .ambient_async import AsyncAmbientController
-from .app_icon import apply_window_icon, configure_process_identity
+from .app_icon import (
+    apply_window_icon,
+    configure_dpi_awareness,
+    configure_process_identity,
+)
 from .audio import AudioEngine, should_play_return_bell
 from .break_prompt_view import BreakPromptBindings, BreakPromptView
 from .config import AppSettings, ConfigStore
@@ -1011,6 +1015,10 @@ def run() -> None:
     logger = configure_logging()
     root: tk.Tk | None = None
     try:
+        try:
+            configure_dpi_awareness()
+        except OSError as error:
+            logger.warning("Setting per-monitor DPI awareness failed: %s", error)
         try:
             configure_process_identity()
         except OSError as error:

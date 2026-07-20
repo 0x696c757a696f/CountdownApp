@@ -40,6 +40,8 @@ class ApplicationLifecycleTests(unittest.TestCase):
         with (
             patch.object(app_module, "SingleInstanceGuard", return_value=guard),
             patch.object(app_module, "configure_logging", return_value=logger),
+            patch.object(app_module, "configure_dpi_awareness"),
+            patch.object(app_module, "configure_process_identity"),
             patch.object(app_module, "show_native_message") as show_message,
             patch.object(app_module.tk, "Tk", return_value=root),
             patch.object(app_module, "CountdownApp", side_effect=RuntimeError("boom")),

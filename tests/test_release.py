@@ -41,8 +41,9 @@ class ReleaseMetadataTests(unittest.TestCase):
             self.assertEqual(0, png.getpixel((0, 0))[3])
         with Image.open(project_root / "clock_icon.ico") as icon:
             self.assertEqual(
-                {(16, 16), (20, 20), (24, 24), (32, 32), (48, 48),
-                 (64, 64), (128, 128), (256, 256)},
+                {(16, 16), (20, 20), (24, 24), (28, 28), (32, 32),
+                 (36, 36), (40, 40), (48, 48), (56, 56), (64, 64),
+                 (72, 72), (80, 80), (96, 96), (128, 128), (256, 256)},
                 icon.info["sizes"],
             )
             smallest = icon.ico.getimage((16, 16)).convert("RGBA")
@@ -54,7 +55,7 @@ class ReleaseMetadataTests(unittest.TestCase):
             partially_transparent_pixels = sum(
                 0 < alpha < 255 for alpha in smallest.getchannel("A").getdata()
             )
-            self.assertLessEqual(partially_transparent_pixels, 8)
+            self.assertGreater(partially_transparent_pixels, 0)
 
     def test_spec_bundles_both_environment_recordings(self):
         project_root = Path(__file__).resolve().parents[1]

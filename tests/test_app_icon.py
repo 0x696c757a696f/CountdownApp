@@ -1,7 +1,12 @@
 import unittest
 from pathlib import Path
 
-from countdownapp.app_icon import apply_window_icon, configure_process_identity
+from countdownapp.app_icon import (
+    apply_window_icon,
+    apply_windows_native_icons,
+    configure_dpi_awareness,
+    configure_process_identity,
+)
 
 
 class RootStub:
@@ -16,6 +21,70 @@ class RootStub:
 
 
 class AppIconTests(unittest.TestCase):
+    def test_windows_enables_per_monitor_v2_before_creating_windows(self):
+        contexts = []
+
+        configured = configure_dpi_awareness(
+            platform_name="win32",
+            setter=contexts.append,
+        )
+
+        self.assertTrue(configured)
+        self.assertEqual([-4], contexts)
+
+    def test_windows_loads_distinct_icons_for_the_current_dpi(self):
+        class WindowStub:
+            def update_idletasks(self):
+                pass
+
+            def winfo_id(self):
+                return 100
+
+        class NativeApiStub:
+            def __init__(self):
+                self.loaded_sizes = []
+                self.applied = []
+
+            def top_level_handle(self, child_handle):
+                self.assert_value(child_handle, 100)
+                return 200
+
+            def dpi_for_window(self, window_handle):
+                self.assert_value(window_handle, 200)
+                return 168
+
+            def metric_for_dpi(self, metric, dpi):
+                self.assert_value(dpi, 168)
+                return {49: 28, 11: 56}[metric]
+
+            def load_icon(self, path, size):
+                self.loaded_sizes.append((path, size))
+                return size * 10
+
+            def set_icon(self, window_handle, kind, icon_handle):
+                self.applied.append((window_handle, kind, icon_handle))
+
+            @staticmethod
+            def assert_value(actual, expected):
+                if actual != expected:
+                    raise AssertionError((actual, expected))
+
+        native = NativeApiStub()
+
+        handles = apply_windows_native_icons(
+            WindowStub(),
+            Path("bundle") / "clock_icon.ico",
+            native_api=native,
+        )
+
+        self.assertEqual(
+            [(Path("bundle") / "clock_icon.ico", 28),
+             (Path("bundle") / "clock_icon.ico", 56)],
+            native.loaded_sizes,
+        )
+        self.assertEqual([(200, 0, 280), (200, 1, 560)], native.applied)
+        self.assertEqual((280, 560), handles)
+
     def test_windows_process_uses_a_stable_taskbar_identity(self):
         app_ids = []
 
@@ -35,6 +104,7 @@ class AppIconTests(unittest.TestCase):
             root,
             resolve_resource=lambda name: Path("bundle") / name,
             image_factory=lambda path: photo,
+            platform_name="linux",
         )
 
         self.assertIs(photo, retained)

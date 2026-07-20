@@ -2,6 +2,8 @@ import re
 import unittest
 from pathlib import Path
 
+from PIL import Image
+
 from countdownapp import __version__
 
 
@@ -27,6 +29,22 @@ class ReleaseMetadataTests(unittest.TestCase):
             "PIL._imagingtk",
         ):
             self.assertIn(f'"{module}"', spec)
+
+    def test_icon_family_has_transparency_and_windows_shell_sizes(self):
+        project_root = Path(__file__).resolve().parents[1]
+        spec = (project_root / "countdown_app.spec").read_text(encoding="utf-8")
+        self.assertIn('root / "clock_icon.png"', spec)
+        self.assertIn('root / "clock_icon.ico"', spec)
+        with Image.open(project_root / "clock_icon.png") as png:
+            self.assertEqual((512, 512), png.size)
+            self.assertEqual("RGBA", png.mode)
+            self.assertEqual(0, png.getpixel((0, 0))[3])
+        with Image.open(project_root / "clock_icon.ico") as icon:
+            self.assertEqual(
+                {(16, 16), (20, 20), (24, 24), (32, 32), (48, 48),
+                 (64, 64), (128, 128), (256, 256)},
+                icon.info["sizes"],
+            )
 
     def test_spec_bundles_both_environment_recordings(self):
         project_root = Path(__file__).resolve().parents[1]

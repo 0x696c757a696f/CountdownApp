@@ -15,6 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 from . import __version__
 from .adaptive import AttentionFeedback
 from .ambient_async import AsyncAmbientController
+from .app_icon import apply_window_icon
 from .audio import AudioEngine, should_play_return_bell
 from .break_prompt_view import BreakPromptBindings, BreakPromptView
 from .config import AppSettings, ConfigStore
@@ -67,6 +68,11 @@ class CountdownApp:
             platform.python_version(),
             platform.platform(),
         )
+        self.app_icon = None
+        try:
+            self.app_icon = apply_window_icon(self.root)
+        except (OSError, tk.TclError) as error:
+            self.logger.warning("Applying application icon failed: %s", error)
         self.store = ConfigStore()
         self.app_settings = self.store.migrate_legacy(
             [install_dir() / "settings.ini", Path.cwd() / "settings.ini"]
@@ -95,7 +101,9 @@ class CountdownApp:
         self.audio_after_id: str | None = None
         self.reminder_view = ReminderView(self.root)
         self.tray_commands: "queue.Queue[str]" = queue.Queue()
-        self.tray = TrayService(resource_path("clock_icon.ico"), self.tray_commands, self.logger)
+        self.tray = TrayService(
+            resource_path("clock_icon.png"), self.tray_commands, self.logger
+        )
         self.hotkeys = GlobalHotkeyService(self.tray_commands, self.logger)
         self.floating_status = FloatingStatusController(self._create_floating_status_view)
 

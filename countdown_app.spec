@@ -12,6 +12,7 @@ assets = [
     (str(root / "4.mp3"), "."),
     (str(root / "ambient_storm.ogg"), "."),
     (str(root / "ambient_rain.ogg"), "."),
+    (str(root / "clock_icon.png"), "."),
     (str(root / "clock_icon.ico"), "."),
 ]
 pixi_library_bin = Path(sys.base_prefix) / "Library" / "bin"

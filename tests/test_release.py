@@ -51,6 +51,10 @@ class ReleaseMetadataTests(unittest.TestCase):
                 for red, green, blue, alpha in smallest.getdata()
             )
             self.assertGreaterEqual(visible_hand_pixels, 6)
+            partially_transparent_pixels = sum(
+                0 < alpha < 255 for alpha in smallest.getchannel("A").getdata()
+            )
+            self.assertLessEqual(partially_transparent_pixels, 8)
 
     def test_spec_bundles_both_environment_recordings(self):
         project_root = Path(__file__).resolve().parents[1]

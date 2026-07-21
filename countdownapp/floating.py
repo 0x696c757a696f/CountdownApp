@@ -19,6 +19,21 @@ class WorkArea:
     bottom: int
 
 
+def configure_floating_tool_window(
+    window: tk.Toplevel,
+    *,
+    platform_name: str = sys.platform,
+) -> bool:
+    """Keep the helper overlay out of the Windows taskbar and Alt+Tab list."""
+    if platform_name != "win32":
+        return False
+    try:
+        window.attributes("-toolwindow", True)
+        return True
+    except tk.TclError:
+        return False
+
+
 def fit_window_position(
     x: int,
     y: int,
@@ -198,9 +213,10 @@ class TkFloatingStatusView:
         self.window = tk.Toplevel(root)
         self.window.withdraw()
         self.window.title(f"{APP_NAME}悬浮计时")
+        self.window.overrideredirect(True)
+        configure_floating_tool_window(self.window)
         if apply_icon is not None:
             apply_icon(self.window)
-        self.window.overrideredirect(True)
         self.window.attributes("-topmost", True)
         self.window.attributes("-alpha", 0.94)
         self.window.configure(bg="#172033")

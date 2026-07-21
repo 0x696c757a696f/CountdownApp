@@ -5,6 +5,7 @@ from countdownapp.floating import (
     FloatingStatusController,
     TkFloatingStatusView,
     WorkArea,
+    configure_floating_tool_window,
     fit_window_position,
 )
 
@@ -104,6 +105,24 @@ class FloatingStatusControllerTests(unittest.TestCase):
 
 
 class FloatingPositionTests(unittest.TestCase):
+    def test_windows_floating_status_is_configured_as_a_tool_window(self):
+        class Window:
+            def __init__(self):
+                self.events = []
+
+            def attributes(self, name, value):
+                self.events.append((name, value))
+
+        window = Window()
+
+        configured = configure_floating_tool_window(
+            window,
+            platform_name="win32",
+        )
+
+        self.assertTrue(configured)
+        self.assertEqual([("-toolwindow", True)], window.events)
+
     def test_keeps_a_visible_position_on_a_monitor_with_negative_coordinates(self):
         area = WorkArea(-1920, 0, 0, 1040)
 

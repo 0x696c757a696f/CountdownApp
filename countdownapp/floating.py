@@ -8,6 +8,8 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Protocol
 
+from . import APP_NAME
+
 
 @dataclass(frozen=True)
 class WorkArea:
@@ -169,7 +171,7 @@ class TkFloatingStatusView:
         except OSError:
             self._monitor_provider = None
         self.window = tk.Toplevel(root)
-        self.window.title("CountdownApp 悬浮计时")
+        self.window.title(f"{APP_NAME}悬浮计时")
         self.window.overrideredirect(True)
         self.window.attributes("-topmost", True)
         self.window.attributes("-alpha", 0.94)

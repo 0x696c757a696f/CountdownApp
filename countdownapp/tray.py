@@ -4,6 +4,8 @@ import logging
 import queue
 from pathlib import Path
 
+from . import APP_NAME
+
 
 class TrayService:
     """Tray adapter that communicates with Tk only through a command queue."""
@@ -35,7 +37,7 @@ class TrayService:
                 MenuItem("停止当前周期", lambda *_: self.commands.put("stop")),
                 MenuItem("退出程序", lambda *_: self.commands.put("quit")),
             )
-            self.icon = Icon("CountdownApp", image, "CountdownApp", menu)
+            self.icon = Icon("CountdownApp", image, APP_NAME, menu)
             self.icon.run_detached()
             return True
         except Exception as error:

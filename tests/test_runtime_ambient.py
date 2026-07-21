@@ -76,7 +76,7 @@ class SettingsFormStub:
     def solfeggio_value(self):
         return {
             "关闭": "off",
-            "Solfeggio 528 Hz": "tone:528",
+            "索尔费吉奥 528 赫兹": "tone:528",
         }.get(self.solfeggio.get(), "off")
 
     @property
@@ -110,7 +110,7 @@ class RuntimeAmbientTests(unittest.TestCase):
         app.focus = SimpleNamespace(state=state)
         app.ambient_var = ValueStub("粉红噪音")
         app.ambient_texture_var = ValueStub("风雨雷暴")
-        app.solfeggio_var = ValueStub("Solfeggio 528 Hz")
+        app.solfeggio_var = ValueStub("索尔费吉奥 528 赫兹")
         app.settings_form = SettingsFormStub(
             app.ambient_var,
             app.ambient_texture_var,
@@ -142,7 +142,7 @@ class RuntimeAmbientTests(unittest.TestCase):
         self.assertEqual(35, app.app_settings.ambient_volume)
         self.assertEqual([app.app_settings], app.store.saved)
         self.assertEqual(
-            "粉红噪音 + 风雨雷暴 + Solfeggio 528 Hz · 35%",
+            "粉红噪音 + 风雨雷暴 + 索尔费吉奥 528 赫兹 · 35%",
             app.runtime_summary.get(),
         )
 

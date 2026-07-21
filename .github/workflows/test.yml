@@ -39,4 +39,4 @@ jobs:
         run: .\build.ps1 -PythonExecutable python
       - name: Verify isolated first launch
         shell: powershell
-        run: .\scripts\smoke_onefile.ps1 -Executable .\dist\CountdownApp.exe -ExpectedVersion 2.2.0
+        run: .\scripts\smoke_onefile.ps1 -Executable .\dist\CountdownApp.exe -ExpectedVersion 3.0

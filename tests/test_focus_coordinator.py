@@ -52,7 +52,7 @@ class FocusCoordinatorTests(unittest.TestCase):
 
         self.assertEqual(1, generation)
         self.assertEqual("02:00", coordinator.display.timer)
-        self.assertEqual("Classic", coordinator.display.phase)
+        self.assertEqual("经典随机", coordinator.display.phase)
         self.assertIn("1 分钟", coordinator.display.interval)
         self.assertNotIn("下次提醒", coordinator.display.interval)
 

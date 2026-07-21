@@ -43,7 +43,7 @@ class V2SettingsDialog:
 
         window = tk.Toplevel(self._root)
         self._window = window
-        window.title("V2 节律设置")
+        window.title("三阶段节律设置")
         layout = v2_window_layout(
             window.winfo_screenwidth(),
             window.winfo_screenheight(),
@@ -56,7 +56,7 @@ class V2SettingsDialog:
         body = ttk.Frame(window, padding=(16, 12), style="App.TFrame")
         body.pack(fill="both", expand=True)
         body.columnconfigure(0, weight=1)
-        ttk.Label(body, text="V2 节律设置", style="Section.TLabel").grid(
+        ttk.Label(body, text="三阶段节律设置", style="Section.TLabel").grid(
             row=0, column=0, sticky="w", pady=(0, 2)
         )
         ttk.Label(

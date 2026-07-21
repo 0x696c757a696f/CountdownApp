@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from tkinter import ttk
 
+from . import APP_DISPLAY_NAME
 from .presentation import (
     responsive_window_layout,
     scroll_fraction_to_reveal,
@@ -12,9 +13,12 @@ from .presentation import (
 )
 from .reminder_view import FLOW_FEEDBACK_LABEL
 from .settings_form import (
+    ALGORITHM_OPTIONS,
     AMBIENT_TEXTURE_OPTIONS,
     AUDIO_OPTIONS,
+    CLASSIC_ALGORITHM_LABEL,
     NOISE_OPTIONS,
+    PHASED_ALGORITHM_LABEL,
     SOLFEGGIO_OPTIONS,
     SettingsForm,
 )
@@ -119,7 +123,7 @@ class SettingsView:
         self._startup_var.set(label)
 
     def refresh_algorithm(self) -> None:
-        if self._form.algorithm.get() == "V2":
+        if self._form.algorithm.get() == PHASED_ALGORITHM_LABEL:
             self._interval_min_entry.configure(textvariable=self._form.anchor_min)
             self._interval_max_entry.configure(textvariable=self._form.anchor_max)
             self._update_v2_summary()
@@ -159,7 +163,7 @@ class SettingsView:
             self._root.geometry(layout.geometry)
 
     def _build_header(self) -> None:
-        ttk.Label(self.frame, text="CountdownApp V2", style="Title.TLabel").grid(
+        ttk.Label(self.frame, text=APP_DISPLAY_NAME, style="Title.TLabel").grid(
             row=0, column=0, sticky="w"
         )
         ttk.Label(
@@ -222,7 +226,7 @@ class SettingsView:
         algorithm = ttk.Combobox(
             parent,
             textvariable=self._form.algorithm,
-            values=("Classic", "V2"),
+            values=ALGORITHM_OPTIONS,
             state="readonly",
             width=22,
         )
@@ -292,7 +296,7 @@ class SettingsView:
         self._settings_actions.grid(row=10, column=3, sticky="e", pady=5)
         self._v2_button = ttk.Button(
             self._settings_actions,
-            text="调整 V2",
+            text="调整三阶段",
             command=self._bindings.on_open_v2,
         )
         self._v2_button.grid(row=0, column=0, padx=(0, 6))
@@ -425,7 +429,7 @@ class SettingsView:
             state="readonly",
             width=24,
         ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
-        ttk.Label(section, text="Solfeggio 频率", style="Form.TLabel").grid(
+        ttk.Label(section, text="索尔费吉奥频率", style="Form.TLabel").grid(
             row=2, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
@@ -572,14 +576,16 @@ class SettingsView:
 
     def _set_duration_preset(self, minutes: int) -> None:
         self._form.total.set(str(minutes))
-        self._form.algorithm.set("V2" if minutes >= 60 else "Classic")
+        self._form.algorithm.set(
+            PHASED_ALGORITHM_LABEL if minutes >= 60 else CLASSIC_ALGORITHM_LABEL
+        )
         self.reset_v2_defaults()
 
     def _update_v2_summary(self, *_args: object) -> None:
-        if self._form.algorithm.get() != "V2":
+        if self._form.algorithm.get() != PHASED_ALGORITHM_LABEL:
             return
         self._v2_summary_var.set(
-            "V2 节律：锚定 "
+            "三阶段节律：锚定 "
             f"{self._form.anchor_min.get()}–{self._form.anchor_max.get()} ｜ 深度 "
             f"{self._form.deep_min.get()}–{self._form.deep_max.get()} ｜ 疲劳 "
             f"{self._form.fatigue_min.get()}–{self._form.fatigue_max.get()} 分钟"

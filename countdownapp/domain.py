@@ -90,9 +90,9 @@ def validate_settings(settings: SessionSettings) -> list[str]:
     if settings.focus_duration_sec <= 0:
         errors.append("总专注时长必须大于 0。")
     if settings.algorithm_mode is AlgorithmMode.V2 and settings.focus_duration_sec < 15 * 60:
-        errors.append("V2 模式要求专注时长至少为 15 分钟。")
+        errors.append("三阶段节律要求专注时长至少为 15 分钟。")
 
-    ranges = [("Classic 随机间隔", settings.classic_interval)]
+    ranges = [("经典随机间隔", settings.classic_interval)]
     if settings.algorithm_mode is AlgorithmMode.V2:
         ranges.extend(
             [
@@ -113,7 +113,7 @@ def validate_settings(settings: SessionSettings) -> list[str]:
         < settings.v2.fatigue_start_sec
         < settings.focus_duration_sec
     ):
-        errors.append("V2 阶段边界必须严格递增并位于总时长内。")
+        errors.append("三阶段边界必须严格递增并位于总时长内。")
     if settings.microbreak_duration_sec <= 0:
         errors.append("微休息时长必须大于 0。")
     if settings.long_break_duration_sec <= 0:

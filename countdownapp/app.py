@@ -12,7 +12,7 @@ from secrets import SystemRandom
 from types import TracebackType
 from tkinter import filedialog, messagebox, ttk
 
-from . import __version__
+from . import APP_DISPLAY_NAME, APP_NAME, __version__
 from .adaptive import AttentionFeedback
 from .ambient_async import AsyncAmbientController
 from .app_icon import (
@@ -155,7 +155,7 @@ class CountdownApp:
                 "安装目录不可写，本次将使用内存默认设置；关闭程序后更改不会保留。"
             )
             if start_hidden:
-                self.tray.notify("CountdownApp 配置未保存", warning)
+                self.tray.notify(f"{APP_NAME}配置未保存", warning)
             else:
                 self.root.after(
                     0,
@@ -173,7 +173,7 @@ class CountdownApp:
         self.logger.info("Application started")
 
     def _configure_root(self) -> None:
-        self.root.title("CountdownApp V2")
+        self.root.title(APP_DISPLAY_NAME)
         window_layout = responsive_window_layout(
             self.root.winfo_screenwidth(),
             self.root.winfo_screenheight(),
@@ -821,7 +821,7 @@ class CountdownApp:
             if adaptive:
                 self._show_banner("我还在原任务上吗？", 8)
                 return
-            self.tray.notify("CountdownApp", "微休息提醒：放松视线，确认当前任务。")
+            self.tray.notify(APP_NAME, "微休息提醒：放松视线，确认当前任务。")
             self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
             self.focus.dismiss_reminder()
@@ -830,7 +830,9 @@ class CountdownApp:
             if adaptive:
                 self._show_banner("深度专注：放松视线，确认任务方向。", 8)
                 return
-            notified = self.tray.notify("CountdownApp", "深度专注提醒：放松视线，确认任务方向。")
+            notified = self.tray.notify(
+                APP_NAME, "深度专注提醒：放松视线，确认任务方向。"
+            )
             self.audio.play_bell(self._current_audio_path())
             self._stop_audio_later(5)
             if notified:
@@ -1010,14 +1012,14 @@ def run() -> None:
         acquired = guard.acquire()
     except OSError as error:
         show_native_message(
-            "CountdownApp 启动失败",
+            f"{APP_NAME}启动失败",
             f"无法建立单实例保护：{error}",
             error=True,
         )
         return
     if not acquired:
         show_native_message(
-            "CountdownApp 已在运行",
+            f"{APP_NAME}已在运行",
             "程序已经启动，主界面可能已隐藏在系统托盘中。",
         )
         return
@@ -1045,8 +1047,8 @@ def run() -> None:
                 exc_info=(exception_type, error, traceback),
             )
             messagebox.showerror(
-                "CountdownApp 发生错误",
-                f"操作执行失败：{error}\n\n详情已写入 Logs。",
+                f"{APP_NAME}发生错误",
+                f"操作执行失败：{error}\n\n详情已写入日志文件。",
                 parent=root,
             )
 
@@ -1056,8 +1058,8 @@ def run() -> None:
     except Exception as error:
         logger.exception("Fatal application startup error")
         show_native_message(
-            "CountdownApp 启动失败",
-            f"程序无法启动：{error}\n\n请查看安装目录中的 Logs。",
+            f"{APP_NAME}启动失败",
+            f"程序无法启动：{error}\n\n请查看安装目录中的日志文件。",
             error=True,
         )
     finally:

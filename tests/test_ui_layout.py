@@ -38,8 +38,38 @@ class SettingsActionLayoutTests(unittest.TestCase):
             if isinstance(widget, ttk.Button) and widget.cget("text") == text
         )
 
+    def test_product_title_is_chinese_and_uses_release_version(self):
+        visible_labels = {
+            widget.cget("text")
+            for widget in self._descendants(self.app.settings_view.frame)
+            if isinstance(widget, ttk.Label) and widget.winfo_ismapped()
+        }
+
+        self.assertEqual("随机专注计时器 3.0", self.root.title())
+        self.assertIn("随机专注计时器 3.0", visible_labels)
+        self.assertFalse(any("CountdownApp" in text for text in visible_labels))
+
+    def test_visible_settings_copy_contains_no_legacy_english_terms(self):
+        self._button("更多设置 ▾").invoke()
+        self.root.update_idletasks()
+        visible_copy = [self.root.title()]
+        for widget in self._descendants(self.app.settings_view.frame):
+            if not widget.winfo_ismapped():
+                continue
+            try:
+                visible_copy.append(str(widget.cget("text")))
+            except tk.TclError:
+                pass
+            if isinstance(widget, ttk.Combobox):
+                visible_copy.extend(map(str, widget.cget("values")))
+
+        combined = "\n".join(visible_copy)
+        for legacy_term in ("CountdownApp", "Classic", "V2", "Solfeggio", "Hz"):
+            with self.subTest(legacy_term=legacy_term):
+                self.assertNotIn(legacy_term, combined)
+
     def test_v2_and_more_settings_actions_share_one_horizontal_row(self):
-        v2_y = self._button("调整 V2").winfo_rooty()
+        v2_y = self._button("调整三阶段").winfo_rooty()
         more_y = self._button("更多设置 ▾").winfo_rooty()
 
         self.assertLessEqual(abs(v2_y - more_y), 2)
@@ -76,11 +106,11 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertLessEqual(max(field.winfo_width() for field in fields), 320)
 
     def test_more_settings_action_remains_visible_in_classic_mode(self):
-        self.app.algorithm_var.set("Classic")
+        self.app.algorithm_var.set("经典随机")
         self.app.settings_view.refresh_algorithm()
         self.root.update_idletasks()
 
-        self.assertFalse(self._button("调整 V2").winfo_ismapped())
+        self.assertFalse(self._button("调整三阶段").winfo_ismapped())
         self.assertTrue(self._button("更多设置 ▾").winfo_ismapped())
 
     def test_expanding_more_settings_keeps_the_collapse_action_visible(self):

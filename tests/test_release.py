@@ -74,7 +74,14 @@ class ReleaseMetadataTests(unittest.TestCase):
             re.findall(r'StringStruct\("(?:File|Product)Version", "([^"]+)"\)', version_resource)
         )
 
+        self.assertEqual("3.0", __version__)
         self.assertEqual({__version__}, resource_versions)
+        self.assertIn("filevers=(3, 0, 0, 0)", version_resource)
+        self.assertIn("prodvers=(3, 0, 0, 0)", version_resource)
+        self.assertIn(
+            'StringStruct("ProductName", "随机专注计时器 3.0")',
+            version_resource,
+        )
         self.assertIn('version=str(root / "version_info.txt")', (project_root / "countdown_app.spec").read_text(encoding="utf-8"))
 
 

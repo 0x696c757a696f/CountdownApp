@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Executable,
-    [string]$ExpectedVersion = "2.2.0",
+    [string]$ExpectedVersion = "3.0",
     [int]$TimeoutSeconds = 30
 )
 

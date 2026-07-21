@@ -41,16 +41,20 @@ AMBIENT_TEXTURE_OPTIONS = {
 
 SOLFEGGIO_OPTIONS = {
     "关闭": "off",
-    "Solfeggio 174 Hz": "tone:174",
-    "Solfeggio 285 Hz": "tone:285",
-    "Solfeggio 396 Hz": "tone:396",
-    "Solfeggio 417 Hz": "tone:417",
-    "Solfeggio 528 Hz": "tone:528",
-    "Solfeggio 639 Hz": "tone:639",
-    "Solfeggio 741 Hz": "tone:741",
-    "Solfeggio 852 Hz": "tone:852",
-    "Solfeggio 963 Hz": "tone:963",
+    "索尔费吉奥 174 赫兹": "tone:174",
+    "索尔费吉奥 285 赫兹": "tone:285",
+    "索尔费吉奥 396 赫兹": "tone:396",
+    "索尔费吉奥 417 赫兹": "tone:417",
+    "索尔费吉奥 528 赫兹": "tone:528",
+    "索尔费吉奥 639 赫兹": "tone:639",
+    "索尔费吉奥 741 赫兹": "tone:741",
+    "索尔费吉奥 852 赫兹": "tone:852",
+    "索尔费吉奥 963 赫兹": "tone:963",
 }
+
+CLASSIC_ALGORITHM_LABEL = "经典随机"
+PHASED_ALGORITHM_LABEL = "三阶段节律"
+ALGORITHM_OPTIONS = (CLASSIC_ALGORITHM_LABEL, PHASED_ALGORITHM_LABEL)
 
 
 class SettingsForm:
@@ -94,7 +98,9 @@ class SettingsForm:
         session = settings.session
         self.total.set(self.format_number(session.focus_duration_sec / 60))
         self.algorithm.set(
-            "V2" if session.algorithm_mode is AlgorithmMode.V2 else "Classic"
+            PHASED_ALGORITHM_LABEL
+            if session.algorithm_mode is AlgorithmMode.V2
+            else CLASSIC_ALGORITHM_LABEL
         )
         self.classic_min.set(
             self.format_number(session.classic_interval.minimum_sec / 60)
@@ -164,12 +170,12 @@ class SettingsForm:
             focus_duration_sec=self.parse_minutes(self.total.get(), "总专注时间"),
             algorithm_mode=(
                 AlgorithmMode.V2
-                if self.algorithm.get() == "V2"
+                if self.algorithm.get() == PHASED_ALGORITHM_LABEL
                 else AlgorithmMode.CLASSIC
             ),
             classic_interval=IntervalRange(
-                self.parse_minutes(self.classic_min.get(), "Classic 最小间隔"),
-                self.parse_minutes(self.classic_max.get(), "Classic 最大间隔"),
+                self.parse_minutes(self.classic_min.get(), "经典随机最小间隔"),
+                self.parse_minutes(self.classic_max.get(), "经典随机最大间隔"),
             ),
             v2=V2Settings(
                 anchor_end_sec=self.parse_minutes(self.anchor_end.get(), "锚定期结束"),

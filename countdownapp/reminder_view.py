@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from tkinter import ttk
 
+from . import APP_NAME
 from .adaptive import AttentionFeedback
 from .display import cover_virtual_desktop
 from .domain import ReminderPreset
@@ -56,7 +57,7 @@ class ReminderView:
         self._on_result = on_result
         window = tk.Toplevel(self._root)
         self._window = window
-        window.title("CountdownApp 提醒")
+        window.title(f"{APP_NAME}提醒")
         window.attributes("-topmost", True)
         width, height = (560, 195) if adaptive else (460, 150)
         x = max(0, (window.winfo_screenwidth() - width) // 2)

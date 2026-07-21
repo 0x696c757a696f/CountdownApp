@@ -187,6 +187,7 @@ class TkFloatingStatusView:
         initial_position: tuple[int, int] | None = None,
         on_position_changed: Callable[[int, int], None] | None = None,
         monitor_provider: MonitorProvider | None = None,
+        apply_icon: Callable[[tk.Toplevel], None] | None = None,
     ) -> None:
         self.root = root
         self._on_position_changed = on_position_changed
@@ -195,7 +196,10 @@ class TkFloatingStatusView:
         except OSError:
             self._monitor_provider = None
         self.window = tk.Toplevel(root)
+        self.window.withdraw()
         self.window.title(f"{APP_NAME}悬浮计时")
+        if apply_icon is not None:
+            apply_icon(self.window)
         self.window.overrideredirect(True)
         self.window.attributes("-topmost", True)
         self.window.attributes("-alpha", 0.94)
@@ -243,6 +247,7 @@ class TkFloatingStatusView:
 
         x, y = self._initial_position(initial_position)
         self._set_geometry(x, y, include_size=True)
+        self.window.deiconify()
 
         self._drag_origin: tuple[int, int] | None = None
         for widget in (self.window, self.timer_label, self.phase_label):

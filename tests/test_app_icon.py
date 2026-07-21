@@ -1,7 +1,10 @@
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
+from countdownapp.app import CountdownApp
 from countdownapp.app_icon import (
+    apply_child_window_icon,
     apply_window_icon,
     apply_windows_native_icons,
     configure_dpi_awareness,
@@ -21,6 +24,36 @@ class RootStub:
 
 
 class AppIconTests(unittest.TestCase):
+    def test_application_applies_its_loaded_icon_to_child_windows(self):
+        app = CountdownApp.__new__(CountdownApp)
+        app.app_icon = object()
+        app.logger = Mock()
+        window = Mock()
+
+        with patch("countdownapp.app.apply_child_window_icon") as apply_icon:
+            app._apply_child_window_icon(window)
+
+        apply_icon.assert_called_once_with(window, app.app_icon)
+
+    def test_child_window_reuses_the_same_icon_family(self):
+        window = RootStub()
+        photo = object()
+
+        apply_child_window_icon(
+            window,
+            photo,
+            resolve_resource=lambda name: Path("bundle") / name,
+            platform_name="linux",
+        )
+
+        self.assertEqual(
+            [
+                ("iconphoto", False, photo),
+                ("iconbitmap", str(Path("bundle") / "clock_icon.ico")),
+            ],
+            window.events,
+        )
+
     def test_windows_enables_per_monitor_v2_before_creating_windows(self):
         contexts = []
 

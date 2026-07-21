@@ -17,11 +17,13 @@ class V2SettingsDialog:
         form: SettingsForm,
         on_reset: Callable[[], None],
         on_closed: Callable[[], None],
+        apply_icon: Callable[[tk.Toplevel], None] | None = None,
     ) -> None:
         self._root = root
         self._form = form
         self._on_reset = on_reset
         self._on_closed = on_closed
+        self._apply_icon = apply_icon
         self._window: tk.Toplevel | None = None
 
     @property
@@ -43,6 +45,9 @@ class V2SettingsDialog:
 
         window = tk.Toplevel(self._root)
         self._window = window
+        window.withdraw()
+        if self._apply_icon is not None:
+            self._apply_icon(window)
         window.title("V2 节律设置")
         layout = v2_window_layout(
             window.winfo_screenwidth(),
@@ -91,6 +96,7 @@ class V2SettingsDialog:
         window.geometry(layout.geometry)
         window.minsize(layout.min_width, layout.min_height)
         window.protocol("WM_DELETE_WINDOW", self.close)
+        window.deiconify()
 
     def close(self) -> None:
         window, self._window = self._window, None

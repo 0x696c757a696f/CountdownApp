@@ -195,3 +195,31 @@ def apply_window_icon(
             # PNG remains the portable icon source on platforms without ICO support.
             pass
     return photo
+
+
+def apply_child_window_icon(
+    window: IconWindow,
+    photo: object,
+    *,
+    resolve_resource: Callable[[str], Path] = resource_path,
+    platform_name: str = sys.platform,
+    native_api: NativeIconApi | None = None,
+) -> None:
+    """Apply the already loaded icon family to an independent child window."""
+    window.iconphoto(False, photo)
+    icon_path = resolve_resource("clock_icon.ico")
+    if platform_name == "win32":
+        try:
+            handles = apply_windows_native_icons(
+                window,
+                icon_path,
+                native_api=native_api,
+            )
+            _retained_native_icon_handles.extend(handles)
+        except (AttributeError, OSError):
+            window.iconbitmap(bitmap=str(icon_path))
+    else:
+        try:
+            window.iconbitmap(bitmap=str(icon_path))
+        except tk.TclError:
+            pass

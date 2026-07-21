@@ -18,11 +18,13 @@ class V2SettingsDialogTests(unittest.TestCase):
         self.form.load(AppSettings())
         self.on_reset = Mock()
         self.on_closed = Mock()
+        self.apply_icon = Mock()
         self.dialog = V2SettingsDialog(
             self.root,
             self.form,
             on_reset=self.on_reset,
             on_closed=self.on_closed,
+            apply_icon=self.apply_icon,
         )
 
     def tearDown(self):
@@ -45,6 +47,16 @@ class V2SettingsDialogTests(unittest.TestCase):
         self.assertTrue(self.dialog.is_open)
         self.assertEqual(1, len(first_windows))
         self.assertEqual(first_windows, second_windows)
+
+    def test_dialog_receives_the_application_icon(self):
+        self.dialog.show()
+        window = next(
+            child
+            for child in self.root.winfo_children()
+            if isinstance(child, tk.Toplevel)
+        )
+
+        self.apply_icon.assert_called_once_with(window)
 
     def test_close_notifies_the_owner_once(self):
         self.dialog.show()

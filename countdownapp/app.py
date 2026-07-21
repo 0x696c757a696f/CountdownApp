@@ -16,6 +16,7 @@ from . import APP_DISPLAY_NAME, APP_NAME, __version__
 from .adaptive import AttentionFeedback
 from .ambient_async import AsyncAmbientController
 from .app_icon import (
+    apply_child_window_icon,
     apply_window_icon,
     configure_dpi_awareness,
     configure_process_identity,
@@ -105,7 +106,10 @@ class CountdownApp:
         self.tick_after_id: str | None = None
         self.tray_after_id: str | None = None
         self.audio_after_id: str | None = None
-        self.reminder_view = ReminderView(self.root)
+        self.reminder_view = ReminderView(
+            self.root,
+            apply_icon=self._apply_child_window_icon,
+        )
         self.tray_commands: "queue.Queue[str]" = queue.Queue()
         self.tray = TrayService(
             resource_path("clock_icon.png"), self.tray_commands, self.logger
@@ -316,6 +320,7 @@ class CountdownApp:
             self.settings_form,
             on_reset=self.settings_view.reset_v2_defaults,
             on_closed=self.settings_view.refresh_algorithm,
+            apply_icon=self._apply_child_window_icon,
         )
         self.settings_view.show()
 
@@ -389,7 +394,17 @@ class CountdownApp:
             on_hide,
             initial_position=initial_position,
             on_position_changed=self._on_floating_position_changed,
+            apply_icon=self._apply_child_window_icon,
         )
+
+    def _apply_child_window_icon(self, window: tk.Toplevel) -> None:
+        photo = getattr(self, "app_icon", None)
+        if photo is None:
+            return
+        try:
+            apply_child_window_icon(window, photo)
+        except (OSError, tk.TclError) as error:
+            self.logger.warning("Applying child window icon failed: %s", error)
 
     def _on_floating_position_changed(self, x: int, y: int) -> None:
         if self.app_settings.floating_x == x and self.app_settings.floating_y == y:

@@ -120,6 +120,24 @@ class FloatingPositionTests(unittest.TestCase):
 
 
 class FloatingStatusLayoutTests(unittest.TestCase):
+    def test_floating_window_receives_the_application_icon(self):
+        try:
+            root = tk.Tk()
+        except tk.TclError as error:
+            self.skipTest(f"Tk is unavailable: {error}")
+        try:
+            icon_windows = []
+            view = TkFloatingStatusView(
+                root,
+                lambda: None,
+                apply_icon=icon_windows.append,
+            )
+
+            self.assertEqual([view.window], icon_windows)
+            view.close()
+        finally:
+            root.destroy()
+
     def test_high_dpi_timer_and_phase_text_do_not_overlap_or_clip(self):
         try:
             root = tk.Tk()

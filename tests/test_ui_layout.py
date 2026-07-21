@@ -249,6 +249,34 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertGreaterEqual(self.root.winfo_height() - button_bottom, 12)
         self.assertEqual(460, self.root.minsize()[1])
 
+    def test_high_dpi_runtime_details_do_not_clip_the_action_row(self):
+        old_scaling = float(self.root.tk.call("tk", "scaling"))
+        try:
+            self.root.tk.call("tk", "scaling", 168 / 72)
+            self.app.settings_view.hide()
+            self.app.runtime_view.show_focus("粉红噪音 + Solfeggio 852 Hz · 20%")
+            self.app.runtime_view.render(
+                RuntimeDisplay(
+                    "89:57",
+                    "注意力锚定期",
+                    "当前基础随机区间：4–7 分钟 ｜ 自适应反馈开启",
+                    "本轮反馈：仍在任务 0 · 走神 0 · 延后下次提醒 0",
+                )
+            )
+            self.root.update()
+            hide_button = next(
+                widget
+                for widget in self._descendants(self.app.runtime_view.frame)
+                if isinstance(widget, ttk.Button)
+                and widget.cget("text") == "隐藏到托盘"
+            )
+            button_bottom = hide_button.winfo_rooty() + hide_button.winfo_height()
+            window_bottom = self.root.winfo_rooty() + self.root.winfo_height()
+
+            self.assertLessEqual(button_bottom + 12, window_bottom)
+        finally:
+            self.root.tk.call("tk", "scaling", old_scaling)
+
     def test_break_prompt_expands_to_show_every_action(self):
         self.app.settings_view.hide()
         self.app.break_prompt_view.show()

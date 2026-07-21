@@ -111,35 +111,59 @@ class FloatingStatusController:
         self._view: FloatingStatusView | None = None
         self._enabled = False
         self._suppressed_for_session = False
+        self._shown_for_session = False
+        self._current_status: tuple[str, str] | None = None
         self._last_status: tuple[str, str] | None = None
 
     def set_enabled(self, enabled: bool) -> None:
         self._enabled = enabled
         if not enabled:
+            self._shown_for_session = False
             self._close_view()
 
     def begin_session(self) -> None:
         self._close_view()
         self._suppressed_for_session = False
+        self._shown_for_session = False
+        self._current_status = None
 
     def update(self, timer_text: str, phase_text: str) -> None:
-        if not self._enabled or self._suppressed_for_session:
-            return
         status = (timer_text, phase_text)
+        self._current_status = status
+        if (
+            not (self._enabled or self._shown_for_session)
+            or self._suppressed_for_session
+        ):
+            return
+        self._render(status)
+
+    def show_for_session(self) -> bool:
+        """Restore the floating timer using the latest active-session status."""
+        if self._current_status is None:
+            return False
+        self._suppressed_for_session = False
+        self._shown_for_session = True
+        self._render(self._current_status)
+        return True
+
+    def _render(self, status: tuple[str, str]) -> None:
         if status == self._last_status:
             return
         if self._view is None:
             self._view = self._view_factory(self.hide_for_session)
-        self._view.update(timer_text, phase_text)
+        self._view.update(*status)
         self._last_status = status
 
     def hide_for_session(self) -> None:
         self._suppressed_for_session = True
+        self._shown_for_session = False
         self._close_view()
 
     def end_session(self) -> None:
         self._close_view()
         self._suppressed_for_session = False
+        self._shown_for_session = False
+        self._current_status = None
 
     def close(self) -> None:
         self._enabled = False
@@ -176,8 +200,8 @@ class TkFloatingStatusView:
         self.window.attributes("-topmost", True)
         self.window.attributes("-alpha", 0.94)
         self.window.configure(bg="#172033")
-        x, y = self._initial_position(initial_position)
-        self._set_geometry(x, y, include_size=True)
+        self._width = self.WIDTH
+        self._height = self.HEIGHT
 
         self.timer_label = tk.Label(
             self.window,
@@ -186,7 +210,8 @@ class TkFloatingStatusView:
             fg="#ffffff",
             bg="#172033",
         )
-        self.timer_label.place(x=16, y=8)
+        timer_y = 6
+        self.timer_label.place(x=16, y=timer_y)
         self.phase_label = tk.Label(
             self.window,
             text="",
@@ -194,7 +219,14 @@ class TkFloatingStatusView:
             fg="#a8b3cf",
             bg="#172033",
         )
-        self.phase_label.place(x=18, y=52)
+        self.window.update_idletasks()
+        phase_y = timer_y + self.timer_label.winfo_reqheight() + 2
+        self.phase_label.place(x=18, y=phase_y)
+        self.window.update_idletasks()
+        self._height = max(
+            self.HEIGHT,
+            phase_y + self.phase_label.winfo_reqheight() + 8,
+        )
         close_button = tk.Button(
             self.window,
             text="×",
@@ -207,7 +239,10 @@ class TkFloatingStatusView:
             activeforeground="#ffffff",
             activebackground="#26324a",
         )
-        close_button.place(x=self.WIDTH - 38, y=7, width=28, height=28)
+        close_button.place(x=self._width - 38, y=7, width=28, height=28)
+
+        x, y = self._initial_position(initial_position)
+        self._set_geometry(x, y, include_size=True)
 
         self._drag_origin: tuple[int, int] | None = None
         for widget in (self.window, self.timer_label, self.phase_label):
@@ -251,16 +286,16 @@ class TkFloatingStatusView:
             return self._fit_to_nearest_monitor(*initial_position)
         area = self._work_area_for_window()
         return fit_window_position(
-            area.right - self.WIDTH - 24,
-            area.bottom - self.HEIGHT - 24,
-            self.WIDTH,
-            self.HEIGHT,
+            area.right - self._width - 24,
+            area.bottom - self._height - 24,
+            self._width,
+            self._height,
             area,
         )
 
     def _fit_to_nearest_monitor(self, x: int, y: int) -> tuple[int, int]:
         area = self._work_area_for_point(x, y)
-        return fit_window_position(x, y, self.WIDTH, self.HEIGHT, area)
+        return fit_window_position(x, y, self._width, self._height, area)
 
     def _work_area_for_window(self) -> WorkArea:
         if self._monitor_provider is not None:
@@ -289,5 +324,5 @@ class TkFloatingStatusView:
         )
 
     def _set_geometry(self, x: int, y: int, include_size: bool = False) -> None:
-        prefix = f"{self.WIDTH}x{self.HEIGHT}" if include_size else ""
+        prefix = f"{self._width}x{self._height}" if include_size else ""
         self.window.geometry(f"{prefix}{x:+d}{y:+d}")

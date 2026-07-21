@@ -51,6 +51,12 @@ class SettingsViewTests(unittest.TestCase):
             result.extend(SettingsViewTests._texts(child))
         return result
 
+    @staticmethod
+    def _descendants(widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from SettingsViewTests._descendants(child)
+
     def test_show_displays_primary_actions_with_more_settings_collapsed(self):
         self.view.show()
         self.view.set_startup_mode(StartupMode.OFF)
@@ -109,6 +115,24 @@ class SettingsViewTests(unittest.TestCase):
         self.assertIn("基础噪音", texts)
         self.assertIn("环境录音", texts)
         self.assertIn("Solfeggio 频率", texts)
+
+    def test_reminder_settings_explain_when_fullscreen_is_used(self):
+        more_button = next(
+            widget
+            for widget in self._descendants(self.view.frame)
+            if isinstance(widget, ttk.Button) and widget.cget("text") == "更多设置 ▾"
+        )
+        more_button.invoke()
+        self.root.update_idletasks()
+        copy = "\n".join(
+            widget.cget("text")
+            for widget in self._descendants(self.view.frame)
+            if isinstance(widget, (ttk.Label, ttk.Checkbutton))
+        )
+
+        self.assertIn("Classic 和 V2 疲劳维护期会全屏", copy)
+        self.assertIn("平衡=半透明全屏，强干预=全黑并抢焦点", copy)
+        self.assertIn("关闭休息倒计时后不会全屏", copy)
 
     @staticmethod
     def _all_widgets(widget):

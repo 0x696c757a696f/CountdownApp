@@ -1,3 +1,4 @@
+import queue
 import unittest
 from dataclasses import replace
 from unittest.mock import Mock, patch
@@ -57,6 +58,22 @@ class RuntimeControlTests(unittest.TestCase):
         app.runtime_view.set_pause_state.assert_called_once_with(
             paused=True, long_break=False
         )
+
+    def test_tray_can_restore_the_floating_timer(self):
+        app = CountdownApp.__new__(CountdownApp)
+        app.tray_after_id = None
+        app.hotkeys = Mock()
+        app.gui_callbacks = queue.Queue()
+        app.tray_commands = queue.Queue()
+        app.tray_commands.put("show_floating")
+        app.root = Mock()
+        app.root.after.return_value = "after-id"
+        app.floating_status = Mock()
+
+        app._poll_tray()
+
+        app.floating_status.show_for_session.assert_called_once_with()
+        self.assertEqual("after-id", app.tray_after_id)
 
 
 if __name__ == "__main__":

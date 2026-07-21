@@ -1,6 +1,12 @@
+import tkinter as tk
 import unittest
 
-from countdownapp.floating import FloatingStatusController, WorkArea, fit_window_position
+from countdownapp.floating import (
+    FloatingStatusController,
+    TkFloatingStatusView,
+    WorkArea,
+    fit_window_position,
+)
 
 
 class FakeView:
@@ -79,6 +85,23 @@ class FloatingStatusControllerTests(unittest.TestCase):
         controller.update("25:00", "注意力锚定期")
         self.assertEqual(2, len(factory.views))
 
+    def test_hidden_view_can_be_restored_with_the_latest_session_status(self):
+        factory = ViewFactory()
+        controller = FloatingStatusController(factory)
+        controller.set_enabled(True)
+        controller.begin_session()
+        controller.update("25:00", "注意力锚定期")
+
+        factory.views[0].on_hide()
+        controller.update("24:59", "注意力锚定期")
+
+        self.assertTrue(controller.show_for_session())
+        self.assertEqual(2, len(factory.views))
+        self.assertEqual(
+            [("24:59", "注意力锚定期")],
+            factory.views[1].updates,
+        )
+
 
 class FloatingPositionTests(unittest.TestCase):
     def test_keeps_a_visible_position_on_a_monitor_with_negative_coordinates(self):
@@ -94,6 +117,39 @@ class FloatingPositionTests(unittest.TestCase):
         position = fit_window_position(5000, -100, 280, 82, area)
 
         self.assertEqual((1632, 8), position)
+
+
+class FloatingStatusLayoutTests(unittest.TestCase):
+    def test_high_dpi_timer_and_phase_text_do_not_overlap_or_clip(self):
+        try:
+            root = tk.Tk()
+        except tk.TclError as error:
+            self.skipTest(f"Tk is unavailable: {error}")
+        old_scaling = float(root.tk.call("tk", "scaling"))
+        try:
+            root.tk.call("tk", "scaling", 168 / 72)
+
+            class Monitor:
+                @staticmethod
+                def work_area_for_window(_window_handle):
+                    return WorkArea(0, 0, 1920, 1040)
+
+                @staticmethod
+                def work_area_for_point(_x, _y):
+                    return WorkArea(0, 0, 1920, 1040)
+
+            view = TkFloatingStatusView(root, lambda: None, monitor_provider=Monitor())
+            view.update("89:52", "注意力锚定期")
+            root.update()
+            timer_bottom = view.timer_label.winfo_y() + view.timer_label.winfo_height()
+            phase_top = view.phase_label.winfo_y()
+            phase_bottom = phase_top + view.phase_label.winfo_height()
+
+            self.assertLessEqual(timer_bottom + 2, phase_top)
+            self.assertLessEqual(phase_bottom + 8, view.window.winfo_height())
+        finally:
+            root.tk.call("tk", "scaling", old_scaling)
+            root.destroy()
 
 
 if __name__ == "__main__":

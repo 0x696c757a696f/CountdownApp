@@ -274,7 +274,7 @@ class SettingsView:
         )
         ttk.Checkbutton(
             parent,
-            text="启用微休息倒计时和回归铃",
+            text="启用微休息倒计时与回归铃（全屏提醒前提）",
             variable=self._form.break_countdown,
             style="Form.TCheckbutton",
         ).grid(row=8, column=1, columnspan=2, sticky="w", padx=(12, 0), pady=7)
@@ -344,6 +344,17 @@ class SettingsView:
             state="readonly",
             width=18,
         ).grid(row=0, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
+        ttk.Label(
+            section,
+            text=(
+                "全屏规则：先启用主页面“休息倒计时”。Classic 和 V2 "
+                "疲劳维护期会全屏；平衡=半透明全屏，强干预=全黑并抢焦点。"
+                "V2 锚定期使用小窗，深度期优先系统通知；关闭休息倒计时后不会全屏。"
+            ),
+            style="FormHint.TLabel",
+            wraplength=620,
+            justify="left",
+        ).grid(row=1, column=0, columnspan=4, sticky="ew", pady=(2, 6))
         ttk.Checkbutton(
             section,
             text=(
@@ -352,14 +363,14 @@ class SettingsView:
             ),
             variable=self._form.adaptive,
             style="Form.TCheckbutton",
-        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Label(
             section,
             text="根据反馈自动调整下一次提醒间隔",
             style="FormHint.TLabel",
-        ).grid(row=2, column=0, columnspan=4, sticky="w", padx=(20, 0), pady=(0, 4))
-        self._audio_row(section, 3, "微休息开始铃", self._form.audio, False)
-        self._audio_row(section, 4, "回归专注铃", self._form.return_audio, True)
+        ).grid(row=3, column=0, columnspan=4, sticky="w", padx=(20, 0), pady=(0, 4))
+        self._audio_row(section, 4, "微休息开始铃", self._form.audio, False)
+        self._audio_row(section, 5, "回归专注铃", self._form.return_audio, True)
 
     def _audio_row(
         self,

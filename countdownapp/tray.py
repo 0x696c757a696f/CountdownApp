@@ -20,10 +20,26 @@ class TrayService:
         self.commands = commands
         self.logger = logger
         self.icon = None
+        self._focus_active = False
 
     @property
     def available(self) -> bool:
         return self.icon is not None
+
+    def is_floating_timer_action_visible(self, _item) -> bool:
+        return self._focus_active
+
+    def set_focus_active(self, active: bool) -> None:
+        active = bool(active)
+        if active == self._focus_active:
+            return
+        self._focus_active = active
+        if self.icon is None:
+            return
+        try:
+            self.icon.update_menu()
+        except Exception as error:
+            self.logger.warning("Updating tray menu failed: %s", error)
 
     def start(self) -> bool:
         try:
@@ -33,6 +49,11 @@ class TrayService:
             image = Image.open(self.icon_path)
             menu = Menu(
                 MenuItem("打开主界面", lambda *_: self.commands.put("show"), default=True),
+                MenuItem(
+                    "显示悬浮计时",
+                    lambda *_: self.commands.put("show_floating"),
+                    visible=self.is_floating_timer_action_visible,
+                ),
                 MenuItem("暂停 / 继续", lambda *_: self.commands.put("pause")),
                 MenuItem("停止当前周期", lambda *_: self.commands.put("stop")),
                 MenuItem("退出程序", lambda *_: self.commands.put("quit")),

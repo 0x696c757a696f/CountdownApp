@@ -137,6 +137,17 @@ class ResponsiveWindowLayoutTests(unittest.TestCase):
         self.assertEqual((600, 460), (expanded.width, expanded.height))
         self.assertEqual(collapsed.x, expanded.x)
 
+    def test_high_dpi_runtime_window_keeps_safety_space_below_measured_content(self):
+        layout = runtime_window_layout(
+            2560,
+            1600,
+            controls_expanded=False,
+            minimum_content_height=402,
+            ui_scale=1.75,
+        )
+
+        self.assertEqual(430, layout.height)
+
     def test_v2_dialog_is_compact_and_centered(self):
         layout = v2_window_layout(1463, 914)
 

@@ -649,6 +649,7 @@ class CountdownApp:
             settings,
             show_next_reminder=self.app_settings.show_next_reminder,
         )
+        self.tray.set_focus_active(True)
         self.floating_status.set_enabled(self.app_settings.floating_status_enabled)
         self.floating_status.begin_session()
         self._play_ambient_selection(
@@ -765,6 +766,7 @@ class CountdownApp:
         self._close_reminder(dismiss=False)
         self.audio.stop_bell()
         self._stop_ambient_playback()
+        self.tray.set_focus_active(False)
         self.floating_status.end_session()
         self.runtime_view.hide()
         self.break_prompt_view.show()
@@ -798,6 +800,7 @@ class CountdownApp:
         self._close_reminder(dismiss=False)
         self.audio.stop_bell()
         self._stop_ambient_playback()
+        self.tray.set_focus_active(False)
         self.floating_status.end_session()
         self.runtime_view.hide()
         self.break_prompt_view.hide()
@@ -956,6 +959,8 @@ class CountdownApp:
                 if command == "show":
                     self.root.deiconify()
                     self.root.lift()
+                elif command == "show_floating":
+                    self.floating_status.show_for_session()
                 elif command == "toggle_window":
                     if self.root.state() == "withdrawn":
                         self.root.deiconify()
@@ -981,6 +986,7 @@ class CountdownApp:
 
     def _shutdown(self) -> None:
         self.logger.info("Application shutting down")
+        self.tray.set_focus_active(False)
         self.focus.shutdown()
         if self.tick_after_id is not None:
             try:

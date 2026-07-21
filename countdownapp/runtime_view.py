@@ -89,19 +89,21 @@ class RuntimeView:
         self._cache.update(
             "timer", display.timer, lambda value: self._timer_label.config(text=value)
         )
-        self._cache.update(
+        detail_changed = self._cache.update(
             "phase", display.phase, lambda value: self._phase_label.config(text=value)
         )
-        self._cache.update(
+        detail_changed |= self._cache.update(
             "interval",
             display.interval,
             lambda value: self._interval_label.config(text=value),
         )
-        self._cache.update(
+        detail_changed |= self._cache.update(
             "feedback",
             display.feedback,
             lambda value: self._feedback_label.config(text=value),
         )
+        if detail_changed and self.is_visible:
+            self.apply_window_layout()
 
     def invalidate(self) -> None:
         self._cache.invalidate()

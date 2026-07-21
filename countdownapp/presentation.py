@@ -112,12 +112,17 @@ def runtime_window_layout(
 ) -> WindowLayout:
     """Return a compact focus window that grows only for visible audio controls."""
     preferred_height = 460 if controls_expanded else 280
+    measured_height = (
+        max(0, minimum_content_height) + _scaled(16, ui_scale)
+        if minimum_content_height > 0
+        else 0
+    )
     width = min(
         _scaled(600, ui_scale),
         max(1, screen_width - _scaled(80, ui_scale)),
     )
     height = min(
-        max(preferred_height, max(0, minimum_content_height)),
+        max(preferred_height, measured_height),
         max(1, screen_height - _scaled(100, ui_scale)),
     )
     return WindowLayout(

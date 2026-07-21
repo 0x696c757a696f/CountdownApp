@@ -49,7 +49,7 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertIn("随机专注计时器 3.0", visible_labels)
         self.assertFalse(any("CountdownApp" in text for text in visible_labels))
 
-    def test_visible_settings_copy_contains_no_legacy_english_terms(self):
+    def test_algorithm_and_frequency_keep_their_standard_names(self):
         self._button("更多设置 ▾").invoke()
         self.root.update_idletasks()
         visible_copy = [self.root.title()]
@@ -64,12 +64,13 @@ class SettingsActionLayoutTests(unittest.TestCase):
                 visible_copy.extend(map(str, widget.cget("values")))
 
         combined = "\n".join(visible_copy)
-        for legacy_term in ("CountdownApp", "Classic", "V2", "Solfeggio", "Hz"):
-            with self.subTest(legacy_term=legacy_term):
-                self.assertNotIn(legacy_term, combined)
+        self.assertNotIn("CountdownApp", combined)
+        self.assertIn("Classic", combined)
+        self.assertIn("V2", combined)
+        self.assertIn("Solfeggio 528 Hz", combined)
 
     def test_v2_and_more_settings_actions_share_one_horizontal_row(self):
-        v2_y = self._button("调整三阶段").winfo_rooty()
+        v2_y = self._button("调整 V2").winfo_rooty()
         more_y = self._button("更多设置 ▾").winfo_rooty()
 
         self.assertLessEqual(abs(v2_y - more_y), 2)
@@ -106,11 +107,11 @@ class SettingsActionLayoutTests(unittest.TestCase):
         self.assertLessEqual(max(field.winfo_width() for field in fields), 320)
 
     def test_more_settings_action_remains_visible_in_classic_mode(self):
-        self.app.algorithm_var.set("经典随机")
+        self.app.algorithm_var.set("Classic")
         self.app.settings_view.refresh_algorithm()
         self.root.update_idletasks()
 
-        self.assertFalse(self._button("调整三阶段").winfo_ismapped())
+        self.assertFalse(self._button("调整 V2").winfo_ismapped())
         self.assertTrue(self._button("更多设置 ▾").winfo_ismapped())
 
     def test_expanding_more_settings_keeps_the_collapse_action_visible(self):

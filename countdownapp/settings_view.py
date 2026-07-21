@@ -296,7 +296,7 @@ class SettingsView:
         self._settings_actions.grid(row=10, column=3, sticky="e", pady=5)
         self._v2_button = ttk.Button(
             self._settings_actions,
-            text="调整三阶段",
+            text="调整 V2",
             command=self._bindings.on_open_v2,
         )
         self._v2_button.grid(row=0, column=0, padx=(0, 6))
@@ -429,7 +429,7 @@ class SettingsView:
             state="readonly",
             width=24,
         ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
-        ttk.Label(section, text="索尔费吉奥频率", style="Form.TLabel").grid(
+        ttk.Label(section, text="Solfeggio 频率", style="Form.TLabel").grid(
             row=2, column=0, sticky="e", pady=4
         )
         ttk.Combobox(
@@ -585,7 +585,7 @@ class SettingsView:
         if self._form.algorithm.get() != PHASED_ALGORITHM_LABEL:
             return
         self._v2_summary_var.set(
-            "三阶段节律：锚定 "
+            "V2 节律：锚定 "
             f"{self._form.anchor_min.get()}–{self._form.anchor_max.get()} ｜ 深度 "
             f"{self._form.deep_min.get()}–{self._form.deep_max.get()} ｜ 疲劳 "
             f"{self._form.fatigue_min.get()}–{self._form.fatigue_max.get()} 分钟"

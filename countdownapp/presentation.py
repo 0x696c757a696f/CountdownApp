@@ -145,7 +145,7 @@ def format_ambient_summary(sources: Sequence[str], volume: int) -> str:
         if source == "off":
             continue
         if source.startswith("tone:"):
-            layers.append(f"索尔费吉奥 {source.removeprefix('tone:')} 赫兹")
+            layers.append(f"Solfeggio {source.removeprefix('tone:')} Hz")
         else:
             layers.append(AMBIENT_NAMES.get(source, source))
     if not layers:

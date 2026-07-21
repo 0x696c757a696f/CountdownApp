@@ -41,19 +41,19 @@ AMBIENT_TEXTURE_OPTIONS = {
 
 SOLFEGGIO_OPTIONS = {
     "关闭": "off",
-    "索尔费吉奥 174 赫兹": "tone:174",
-    "索尔费吉奥 285 赫兹": "tone:285",
-    "索尔费吉奥 396 赫兹": "tone:396",
-    "索尔费吉奥 417 赫兹": "tone:417",
-    "索尔费吉奥 528 赫兹": "tone:528",
-    "索尔费吉奥 639 赫兹": "tone:639",
-    "索尔费吉奥 741 赫兹": "tone:741",
-    "索尔费吉奥 852 赫兹": "tone:852",
-    "索尔费吉奥 963 赫兹": "tone:963",
+    "Solfeggio 174 Hz": "tone:174",
+    "Solfeggio 285 Hz": "tone:285",
+    "Solfeggio 396 Hz": "tone:396",
+    "Solfeggio 417 Hz": "tone:417",
+    "Solfeggio 528 Hz": "tone:528",
+    "Solfeggio 639 Hz": "tone:639",
+    "Solfeggio 741 Hz": "tone:741",
+    "Solfeggio 852 Hz": "tone:852",
+    "Solfeggio 963 Hz": "tone:963",
 }
 
-CLASSIC_ALGORITHM_LABEL = "经典随机"
-PHASED_ALGORITHM_LABEL = "三阶段节律"
+CLASSIC_ALGORITHM_LABEL = "Classic"
+PHASED_ALGORITHM_LABEL = "V2"
 ALGORITHM_OPTIONS = (CLASSIC_ALGORITHM_LABEL, PHASED_ALGORITHM_LABEL)
 
 
@@ -174,8 +174,8 @@ class SettingsForm:
                 else AlgorithmMode.CLASSIC
             ),
             classic_interval=IntervalRange(
-                self.parse_minutes(self.classic_min.get(), "经典随机最小间隔"),
-                self.parse_minutes(self.classic_max.get(), "经典随机最大间隔"),
+                self.parse_minutes(self.classic_min.get(), "Classic 最小间隔"),
+                self.parse_minutes(self.classic_max.get(), "Classic 最大间隔"),
             ),
             v2=V2Settings(
                 anchor_end_sec=self.parse_minutes(self.anchor_end.get(), "锚定期结束"),

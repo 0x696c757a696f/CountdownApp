@@ -231,7 +231,7 @@ class RuntimeView:
             1, "环境录音", self._bindings.texture_var, texture_options
         )
         self._ambient_combobox_row(
-            2, "索尔费吉奥", self._bindings.tone_var, tone_options
+            2, "Solfeggio", self._bindings.tone_var, tone_options
         )
         ttk.Label(self._ambient_controls, text="音量", style="Form.TLabel").grid(
             row=3, column=0, sticky="e", pady=4

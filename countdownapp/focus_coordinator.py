@@ -13,7 +13,7 @@ from .session import FocusSession, RuntimeEvent
 
 
 PHASE_NAMES = {
-    None: "经典随机",
+    None: "Classic",
     V2Phase.ATTENTION_ANCHOR: "注意力锚定期",
     V2Phase.DEEP_FOCUS: "深度专注期",
     V2Phase.FATIGUE_SUPPORT: "疲劳维护期",

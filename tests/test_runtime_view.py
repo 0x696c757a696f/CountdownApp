@@ -31,7 +31,7 @@ class RuntimeViewTests(unittest.TestCase):
             self.bindings,
             noise_options=("关闭", "粉红噪音"),
             texture_options=("关闭", "风雨雷暴", "雨声"),
-            tone_options=("关闭", "索尔费吉奥 528 赫兹"),
+            tone_options=("关闭", "Solfeggio 528 Hz"),
         )
 
     def tearDown(self):
@@ -66,7 +66,7 @@ class RuntimeViewTests(unittest.TestCase):
         texts = self._texts(self.root)
         self.assertIn("基础噪音", texts)
         self.assertIn("环境录音", texts)
-        self.assertIn("索尔费吉奥", texts)
+        self.assertIn("Solfeggio", texts)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from countdownapp.reminder_view import (
     ReminderResultKind,
     ReminderView,
     banner_action_columns,
+    present_reminder_window,
 )
 
 
@@ -20,6 +21,37 @@ class BannerActionLayoutTests(unittest.TestCase):
         self.assertEqual(4, banner_action_columns(widths, available_width=650))
         self.assertEqual(2, banner_action_columns(widths, available_width=480))
         self.assertEqual(1, banner_action_columns(widths, available_width=260))
+
+    def test_presentation_maps_the_window_before_reasserting_topmost(self):
+        class Window:
+            def __init__(self):
+                self.events = []
+
+            def deiconify(self):
+                self.events.append(("deiconify",))
+
+            def update_idletasks(self):
+                self.events.append(("update_idletasks",))
+
+            def attributes(self, name, value):
+                self.events.append(("attributes", name, value))
+
+            def lift(self):
+                self.events.append(("lift",))
+
+        window = Window()
+
+        present_reminder_window(window)
+
+        self.assertEqual(
+            [
+                ("deiconify",),
+                ("update_idletasks",),
+                ("attributes", "-topmost", True),
+                ("lift",),
+            ],
+            window.events,
+        )
 
 
 class ReminderViewTests(unittest.TestCase):

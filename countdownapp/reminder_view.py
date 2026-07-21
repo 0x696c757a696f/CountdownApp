@@ -39,6 +39,14 @@ def banner_action_columns(
     return 1
 
 
+def present_reminder_window(window: tk.Toplevel) -> None:
+    """Map a reminder before reasserting its Windows foreground presentation."""
+    window.deiconify()
+    window.update_idletasks()
+    window.attributes("-topmost", True)
+    window.lift()
+
+
 class ReminderResultKind(str, Enum):
     SKIPPED = "skipped"
     COMPLETED = "completed"
@@ -88,7 +96,6 @@ class ReminderView:
         if self._apply_icon is not None:
             self._apply_icon(window)
         window.title(f"{APP_NAME}提醒")
-        window.attributes("-topmost", True)
         screen_width = window.winfo_screenwidth()
         screen_height = window.winfo_screenheight()
 
@@ -151,7 +158,7 @@ class ReminderView:
         x = max(0, (screen_width - requested_width) // 2)
         y = max(0, min(round(screen_height * 0.04), screen_height - requested_height))
         window.geometry(f"+{x}+{y}")
-        window.deiconify()
+        present_reminder_window(window)
         self._bind_close_actions(window)
         self._after_id = self._root.after(
             duration_sec * 1000,
@@ -173,7 +180,6 @@ class ReminderView:
         if self._apply_icon is not None:
             self._apply_icon(window)
         window.overrideredirect(True)
-        window.attributes("-topmost", True)
         window.configure(bg="black")
         cover_virtual_desktop(window)
         if preset is ReminderPreset.BALANCED:
@@ -210,8 +216,7 @@ class ReminderView:
             font=("Microsoft YaHei UI", 14),
         ).pack(side="left", padx=6)
         self._bind_close_actions(window)
-        window.deiconify()
-        window.lift()
+        present_reminder_window(window)
         if preset is ReminderPreset.STRONG:
             window.focus_force()
         else:

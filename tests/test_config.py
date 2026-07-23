@@ -25,7 +25,8 @@ class ConfigStoreTests(unittest.TestCase):
 
         self.assertEqual("0.wav", settings.audio_choice)
         self.assertEqual("1.wav", settings.return_audio_choice)
-        self.assertFalse(settings.session.fullscreen_reminders_enabled)
+        self.assertFalse(settings.session.classic_fullscreen_reminders_enabled)
+        self.assertFalse(settings.session.v2_fatigue_fullscreen_reminders_enabled)
         self.assertEqual("off", settings.ambient_choice)
         self.assertEqual("off", settings.ambient_texture_choice)
         self.assertEqual("off", settings.solfeggio_choice)
@@ -43,7 +44,8 @@ class ConfigStoreTests(unittest.TestCase):
                         **session.__dict__,
                         "reminder_preset": ReminderPreset.STRONG,
                         "break_countdown_enabled": False,
-                        "fullscreen_reminders_enabled": True,
+                        "classic_fullscreen_reminders_enabled": True,
+                        "v2_fatigue_fullscreen_reminders_enabled": True,
                         "adaptive_reminders_enabled": True,
                     }
                 ),
@@ -79,14 +81,16 @@ class ConfigStoreTests(unittest.TestCase):
             data["audio"].pop("return_choice")
             data["audio"].pop("return_custom_path")
             data["session"].pop("break_countdown_enabled")
-            data["session"].pop("fullscreen_reminders_enabled")
+            data["session"].pop("classic_fullscreen_reminders_enabled")
+            data["session"].pop("v2_fatigue_fullscreen_reminders_enabled")
             data.pop("ambient")
             path.write_text(json.dumps(data), encoding="utf-8")
 
             loaded = store.load()
 
             self.assertTrue(loaded.session.break_countdown_enabled)
-            self.assertFalse(loaded.session.fullscreen_reminders_enabled)
+            self.assertFalse(loaded.session.classic_fullscreen_reminders_enabled)
+            self.assertFalse(loaded.session.v2_fatigue_fullscreen_reminders_enabled)
             self.assertTrue(loaded.close_to_tray)
             self.assertEqual("2.wav", loaded.audio_choice)
             self.assertEqual("1.wav", loaded.return_audio_choice)
@@ -160,6 +164,22 @@ class ConfigStoreTests(unittest.TestCase):
                 SessionSettings.defaults().v2.fatigue_interval,
                 loaded.session.v2.fatigue_interval,
             )
+
+    def test_shared_fullscreen_setting_migrates_without_enabling_v2_fatigue(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            store = ConfigStore(path)
+            store.save(AppSettings())
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["session"].pop("classic_fullscreen_reminders_enabled")
+            data["session"].pop("v2_fatigue_fullscreen_reminders_enabled")
+            data["session"]["fullscreen_reminders_enabled"] = True
+            path.write_text(json.dumps(data), encoding="utf-8")
+
+            loaded = store.load()
+
+            self.assertTrue(loaded.session.classic_fullscreen_reminders_enabled)
+            self.assertFalse(loaded.session.v2_fatigue_fullscreen_reminders_enabled)
 
     def test_common_string_booleans_are_decoded_by_value(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -346,22 +346,27 @@ class SettingsView:
         ).grid(row=0, column=1, columnspan=3, sticky="ew", padx=(12, 0), pady=4)
         ttk.Checkbutton(
             section,
-            text="启用全屏提醒（默认关闭）",
-            variable=self._form.fullscreen_reminders,
+            text="Classic 全屏提醒（默认关闭）",
+            variable=self._form.classic_fullscreen_reminders,
             style="Form.TCheckbutton",
         ).grid(row=1, column=0, columnspan=4, sticky="w", pady=4)
+        ttk.Checkbutton(
+            section,
+            text="V2 疲劳期全屏提醒（默认关闭）",
+            variable=self._form.v2_fatigue_fullscreen_reminders,
+            style="Form.TCheckbutton",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Label(
             section,
             text=(
-                "全屏提醒默认关闭；未启用时使用小提醒窗。只有同时启用休息倒计时"
-                "和全屏提醒，Classic 和 V2 疲劳维护期才会全屏；"
+                "两个开关互不影响，未启用时使用小提醒窗；全屏还要求启用休息倒计时。"
                 "平衡=半透明全屏，强干预=全黑并抢焦点。"
                 "V2 锚定期仍使用小窗，深度期仍优先使用系统通知。"
             ),
             style="FormHint.TLabel",
             wraplength=620,
             justify="left",
-        ).grid(row=2, column=0, columnspan=4, sticky="ew", pady=(2, 6))
+        ).grid(row=3, column=0, columnspan=4, sticky="ew", pady=(2, 6))
         ttk.Checkbutton(
             section,
             text=(
@@ -370,14 +375,14 @@ class SettingsView:
             ),
             variable=self._form.adaptive,
             style="Form.TCheckbutton",
-        ).grid(row=3, column=0, columnspan=4, sticky="w", pady=4)
+        ).grid(row=4, column=0, columnspan=4, sticky="w", pady=4)
         ttk.Label(
             section,
             text="根据反馈自动调整下一次提醒间隔",
             style="FormHint.TLabel",
-        ).grid(row=4, column=0, columnspan=4, sticky="w", padx=(20, 0), pady=(0, 4))
-        self._audio_row(section, 5, "微休息开始铃", self._form.audio, False)
-        self._audio_row(section, 6, "回归专注铃", self._form.return_audio, True)
+        ).grid(row=5, column=0, columnspan=4, sticky="w", padx=(20, 0), pady=(0, 4))
+        self._audio_row(section, 6, "微休息开始铃", self._form.audio, False)
+        self._audio_row(section, 7, "回归专注铃", self._form.return_audio, True)
 
     def _audio_row(
         self,

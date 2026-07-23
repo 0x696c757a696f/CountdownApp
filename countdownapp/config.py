@@ -146,8 +146,11 @@ class ConfigStore:
                 "reminder_preset": session.reminder_preset.value,
                 "microbreak_duration_sec": session.microbreak_duration_sec,
                 "break_countdown_enabled": session.break_countdown_enabled,
-                "fullscreen_reminders_enabled": (
-                    session.fullscreen_reminders_enabled
+                "classic_fullscreen_reminders_enabled": (
+                    session.classic_fullscreen_reminders_enabled
+                ),
+                "v2_fatigue_fullscreen_reminders_enabled": (
+                    session.v2_fatigue_fullscreen_reminders_enabled
                 ),
                 "adaptive_reminders_enabled": session.adaptive_reminders_enabled,
                 "long_break_duration_sec": session.long_break_duration_sec,
@@ -204,9 +207,13 @@ class ConfigStore:
                 raw_session.get("break_countdown_enabled", True),
                 "session.break_countdown_enabled",
             ),
-            fullscreen_reminders_enabled=decode_bool(
-                raw_session.get("fullscreen_reminders_enabled", False),
-                "session.fullscreen_reminders_enabled",
+            classic_fullscreen_reminders_enabled=decode_bool(
+                raw_session.get("classic_fullscreen_reminders_enabled", False),
+                "session.classic_fullscreen_reminders_enabled",
+            ),
+            v2_fatigue_fullscreen_reminders_enabled=decode_bool(
+                raw_session.get("v2_fatigue_fullscreen_reminders_enabled", False),
+                "session.v2_fatigue_fullscreen_reminders_enabled",
             ),
             adaptive_reminders_enabled=decode_bool(
                 raw_session.get("adaptive_reminders_enabled", False),
@@ -289,6 +296,15 @@ class ConfigStore:
     def _normalize_legacy_shape(data: dict) -> None:
         if not isinstance(data, dict):
             return
+        session = data.get("session")
+        if isinstance(session, dict):
+            shared_fullscreen = session.get("fullscreen_reminders_enabled")
+            if (
+                shared_fullscreen is not None
+                and "classic_fullscreen_reminders_enabled" not in session
+            ):
+                session["classic_fullscreen_reminders_enabled"] = shared_fullscreen
+            session.pop("fullscreen_reminders_enabled", None)
         ambient = data.get("ambient")
         if not isinstance(ambient, dict):
             return

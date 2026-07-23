@@ -281,7 +281,12 @@ class CountdownApp:
         self.preset_var = self.settings_form.preset
         self.microbreak_var = self.settings_form.microbreak
         self.break_countdown_var = self.settings_form.break_countdown
-        self.fullscreen_reminders_var = self.settings_form.fullscreen_reminders
+        self.classic_fullscreen_reminders_var = (
+            self.settings_form.classic_fullscreen_reminders
+        )
+        self.v2_fatigue_fullscreen_reminders_var = (
+            self.settings_form.v2_fatigue_fullscreen_reminders
+        )
         self.adaptive_var = self.settings_form.adaptive
         self.long_break_var = self.settings_form.long_break
         self.audio_var = self.settings_form.audio
@@ -869,7 +874,13 @@ class CountdownApp:
                 duration = max(8, duration)
             self._show_banner("我还在原任务上吗？", duration)
             return
-        if settings.fullscreen_reminders_enabled:
+        fullscreen_enabled = (
+            phase is None and settings.classic_fullscreen_reminders_enabled
+        ) or (
+            phase is V2Phase.FATIGUE_SUPPORT
+            and settings.v2_fatigue_fullscreen_reminders_enabled
+        )
+        if fullscreen_enabled:
             self._show_overlay(settings.microbreak_duration_sec, preset)
         else:
             self._show_banner(

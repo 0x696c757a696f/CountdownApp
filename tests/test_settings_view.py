@@ -130,8 +130,9 @@ class SettingsViewTests(unittest.TestCase):
             if isinstance(widget, (ttk.Label, ttk.Checkbutton))
         )
 
-        self.assertIn("启用全屏提醒（默认关闭）", copy)
-        self.assertIn("Classic 和 V2 疲劳维护期才会全屏", copy)
+        self.assertIn("Classic 全屏提醒（默认关闭）", copy)
+        self.assertIn("V2 疲劳期全屏提醒（默认关闭）", copy)
+        self.assertIn("两个开关互不影响", copy)
         self.assertIn("未启用时使用小提醒窗", copy)
         self.assertIn("平衡=半透明全屏，强干预=全黑并抢焦点", copy)
 

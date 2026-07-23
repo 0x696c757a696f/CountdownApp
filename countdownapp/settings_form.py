@@ -76,7 +76,8 @@ class SettingsForm:
         self.preset = tk.StringVar(master)
         self.microbreak = tk.StringVar(master)
         self.break_countdown = tk.BooleanVar(master)
-        self.fullscreen_reminders = tk.BooleanVar(master)
+        self.classic_fullscreen_reminders = tk.BooleanVar(master)
+        self.v2_fatigue_fullscreen_reminders = tk.BooleanVar(master)
         self.adaptive = tk.BooleanVar(master)
         self.long_break = tk.StringVar(master)
         self.audio = tk.StringVar(master)
@@ -136,7 +137,12 @@ class SettingsForm:
         )
         self.microbreak.set(str(session.microbreak_duration_sec))
         self.break_countdown.set(session.break_countdown_enabled)
-        self.fullscreen_reminders.set(session.fullscreen_reminders_enabled)
+        self.classic_fullscreen_reminders.set(
+            session.classic_fullscreen_reminders_enabled
+        )
+        self.v2_fatigue_fullscreen_reminders.set(
+            session.v2_fatigue_fullscreen_reminders_enabled
+        )
         self.adaptive.set(session.adaptive_reminders_enabled)
         self.long_break.set(
             self.format_number(session.long_break_duration_sec / 60)
@@ -206,7 +212,12 @@ class SettingsForm:
                 self.microbreak.get(), "微休息"
             ),
             break_countdown_enabled=self.break_countdown.get(),
-            fullscreen_reminders_enabled=self.fullscreen_reminders.get(),
+            classic_fullscreen_reminders_enabled=(
+                self.classic_fullscreen_reminders.get()
+            ),
+            v2_fatigue_fullscreen_reminders_enabled=(
+                self.v2_fatigue_fullscreen_reminders.get()
+            ),
             long_break_duration_sec=self.parse_minutes(
                 self.long_break.get(), "大休息"
             ),

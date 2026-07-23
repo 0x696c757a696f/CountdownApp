@@ -43,7 +43,7 @@ class RuntimeControlTests(unittest.TestCase):
         settings = replace(
             SessionSettings.defaults(algorithm_mode=AlgorithmMode.CLASSIC),
             break_countdown_enabled=True,
-            fullscreen_reminders_enabled=False,
+            classic_fullscreen_reminders_enabled=False,
         )
         app = self.reminder_app(settings)
 
@@ -58,7 +58,7 @@ class RuntimeControlTests(unittest.TestCase):
         settings = replace(
             SessionSettings.defaults(algorithm_mode=AlgorithmMode.V2),
             break_countdown_enabled=True,
-            fullscreen_reminders_enabled=False,
+            v2_fatigue_fullscreen_reminders_enabled=False,
         )
         app = self.reminder_app(settings)
 
@@ -69,23 +69,42 @@ class RuntimeControlTests(unittest.TestCase):
         )
         app._show_overlay.assert_not_called()
 
-    def test_explicit_fullscreen_setting_enables_overlays_for_classic_and_v2(self):
-        for phase in (None, V2Phase.FATIGUE_SUPPORT):
-            with self.subTest(phase=phase):
-                settings = replace(
-                    SessionSettings.defaults(),
-                    break_countdown_enabled=True,
-                    fullscreen_reminders_enabled=True,
-                )
-                app = self.reminder_app(settings)
+    def test_classic_fullscreen_does_not_enable_v2_fatigue_fullscreen(self):
+        settings = replace(
+            SessionSettings.defaults(),
+            break_countdown_enabled=True,
+            classic_fullscreen_reminders_enabled=True,
+            v2_fatigue_fullscreen_reminders_enabled=False,
+        )
 
-                app._show_reminder(phase)
+        classic_app = self.reminder_app(settings)
+        classic_app._show_reminder(None)
+        classic_app._show_overlay.assert_called_once()
 
-                app._show_overlay.assert_called_once_with(
-                    settings.microbreak_duration_sec,
-                    settings.reminder_preset,
-                )
-                app._show_banner.assert_not_called()
+        fatigue_app = self.reminder_app(settings)
+        fatigue_app._show_reminder(V2Phase.FATIGUE_SUPPORT)
+        fatigue_app._show_banner.assert_called_once()
+        fatigue_app._show_overlay.assert_not_called()
+
+    def test_v2_fatigue_fullscreen_does_not_enable_classic_fullscreen(self):
+        settings = replace(
+            SessionSettings.defaults(),
+            break_countdown_enabled=True,
+            classic_fullscreen_reminders_enabled=False,
+            v2_fatigue_fullscreen_reminders_enabled=True,
+        )
+
+        classic_app = self.reminder_app(settings)
+        classic_app._show_reminder(None)
+        classic_app._show_banner.assert_called_once()
+        classic_app._show_overlay.assert_not_called()
+
+        fatigue_app = self.reminder_app(settings)
+        fatigue_app._show_reminder(V2Phase.FATIGUE_SUPPORT)
+        fatigue_app._show_overlay.assert_called_once_with(
+            settings.microbreak_duration_sec,
+            settings.reminder_preset,
+        )
 
     def test_start_confirmation_explains_when_settings_can_produce_no_reminder(self):
         app = CountdownApp.__new__(CountdownApp)

@@ -59,6 +59,7 @@ class SessionSettings:
     reminder_preset: ReminderPreset = ReminderPreset.BALANCED
     microbreak_duration_sec: int = 10
     break_countdown_enabled: bool = True
+    fullscreen_reminders_enabled: bool = False
     long_break_duration_sec: int = 20 * 60
     adaptive_reminders_enabled: bool = False
 

@@ -146,6 +146,9 @@ class ConfigStore:
                 "reminder_preset": session.reminder_preset.value,
                 "microbreak_duration_sec": session.microbreak_duration_sec,
                 "break_countdown_enabled": session.break_countdown_enabled,
+                "fullscreen_reminders_enabled": (
+                    session.fullscreen_reminders_enabled
+                ),
                 "adaptive_reminders_enabled": session.adaptive_reminders_enabled,
                 "long_break_duration_sec": session.long_break_duration_sec,
                 "classic_interval": {
@@ -200,6 +203,10 @@ class ConfigStore:
             break_countdown_enabled=decode_bool(
                 raw_session.get("break_countdown_enabled", True),
                 "session.break_countdown_enabled",
+            ),
+            fullscreen_reminders_enabled=decode_bool(
+                raw_session.get("fullscreen_reminders_enabled", False),
+                "session.fullscreen_reminders_enabled",
             ),
             adaptive_reminders_enabled=decode_bool(
                 raw_session.get("adaptive_reminders_enabled", False),

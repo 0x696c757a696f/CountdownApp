@@ -281,6 +281,7 @@ class CountdownApp:
         self.preset_var = self.settings_form.preset
         self.microbreak_var = self.settings_form.microbreak
         self.break_countdown_var = self.settings_form.break_countdown
+        self.fullscreen_reminders_var = self.settings_form.fullscreen_reminders
         self.adaptive_var = self.settings_form.adaptive
         self.long_break_var = self.settings_form.long_break
         self.audio_var = self.settings_form.audio
@@ -868,7 +869,13 @@ class CountdownApp:
                 duration = max(8, duration)
             self._show_banner("我还在原任务上吗？", duration)
             return
-        self._show_overlay(settings.microbreak_duration_sec, preset)
+        if settings.fullscreen_reminders_enabled:
+            self._show_overlay(settings.microbreak_duration_sec, preset)
+        else:
+            self._show_banner(
+                "微休息：放松视线和肩颈。",
+                settings.microbreak_duration_sec,
+            )
 
     def _show_banner(self, message: str, duration_sec: int) -> None:
         settings = self.focus.settings

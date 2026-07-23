@@ -33,6 +33,7 @@ class SettingsFormTests(unittest.TestCase):
             reminder_preset=ReminderPreset.STRONG,
             microbreak_duration_sec=12,
             break_countdown_enabled=False,
+            fullscreen_reminders_enabled=True,
             long_break_duration_sec=18 * 60,
             adaptive_reminders_enabled=True,
         )

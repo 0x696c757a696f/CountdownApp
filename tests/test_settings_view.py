@@ -116,7 +116,7 @@ class SettingsViewTests(unittest.TestCase):
         self.assertIn("环境录音", texts)
         self.assertIn("Solfeggio 频率", texts)
 
-    def test_reminder_settings_explain_when_fullscreen_is_used(self):
+    def test_reminder_settings_make_fullscreen_an_explicit_opt_in(self):
         more_button = next(
             widget
             for widget in self._descendants(self.view.frame)
@@ -130,9 +130,10 @@ class SettingsViewTests(unittest.TestCase):
             if isinstance(widget, (ttk.Label, ttk.Checkbutton))
         )
 
-        self.assertIn("Classic 和 V2 疲劳维护期会全屏", copy)
+        self.assertIn("启用全屏提醒（默认关闭）", copy)
+        self.assertIn("Classic 和 V2 疲劳维护期才会全屏", copy)
+        self.assertIn("未启用时使用小提醒窗", copy)
         self.assertIn("平衡=半透明全屏，强干预=全黑并抢焦点", copy)
-        self.assertIn("关闭休息倒计时后不会全屏", copy)
 
     @staticmethod
     def _all_widgets(widget):

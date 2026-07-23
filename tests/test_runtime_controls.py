@@ -9,6 +9,7 @@ from countdownapp.domain import (
     IntervalRange,
     SessionSettings,
     SessionState,
+    V2Phase,
 )
 
 
@@ -27,6 +28,65 @@ class FocusCoordinatorStub:
 
 
 class RuntimeControlTests(unittest.TestCase):
+    @staticmethod
+    def reminder_app(settings):
+        app = CountdownApp.__new__(CountdownApp)
+        app.focus = Mock(settings=settings)
+        app.logger = Mock()
+        app._show_banner = Mock()
+        app._show_overlay = Mock()
+        app.tray = Mock()
+        app.audio = Mock()
+        return app
+
+    def test_classic_countdown_uses_a_small_window_until_fullscreen_is_enabled(self):
+        settings = replace(
+            SessionSettings.defaults(algorithm_mode=AlgorithmMode.CLASSIC),
+            break_countdown_enabled=True,
+            fullscreen_reminders_enabled=False,
+        )
+        app = self.reminder_app(settings)
+
+        app._show_reminder(None)
+
+        app._show_banner.assert_called_once_with(
+            "微休息：放松视线和肩颈。", settings.microbreak_duration_sec
+        )
+        app._show_overlay.assert_not_called()
+
+    def test_v2_fatigue_countdown_uses_a_small_window_until_fullscreen_is_enabled(self):
+        settings = replace(
+            SessionSettings.defaults(algorithm_mode=AlgorithmMode.V2),
+            break_countdown_enabled=True,
+            fullscreen_reminders_enabled=False,
+        )
+        app = self.reminder_app(settings)
+
+        app._show_reminder(V2Phase.FATIGUE_SUPPORT)
+
+        app._show_banner.assert_called_once_with(
+            "微休息：放松视线和肩颈。", settings.microbreak_duration_sec
+        )
+        app._show_overlay.assert_not_called()
+
+    def test_explicit_fullscreen_setting_enables_overlays_for_classic_and_v2(self):
+        for phase in (None, V2Phase.FATIGUE_SUPPORT):
+            with self.subTest(phase=phase):
+                settings = replace(
+                    SessionSettings.defaults(),
+                    break_countdown_enabled=True,
+                    fullscreen_reminders_enabled=True,
+                )
+                app = self.reminder_app(settings)
+
+                app._show_reminder(phase)
+
+                app._show_overlay.assert_called_once_with(
+                    settings.microbreak_duration_sec,
+                    settings.reminder_preset,
+                )
+                app._show_banner.assert_not_called()
+
     def test_start_confirmation_explains_when_settings_can_produce_no_reminder(self):
         app = CountdownApp.__new__(CountdownApp)
         settings = replace(
